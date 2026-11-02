@@ -388,12 +388,26 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
 .lay-stack.script-open .lcol{display:none}
 .lay-stack.script-open .simbar{order:1}
 .view-script .simbar{display:none!important}
+
+/* ===== v1.4 분할 배치: PFD·ND·CDU·기어/플랩/EICAS 를 첫 화면에 한 줄로 맞춤 (아래로 스크롤하면 MCP 해설) ===== */
+.lay-split .rcol{display:grid;justify-content:center;align-content:start;column-gap:8px;row-gap:10px}
+.lay-split .rcol>.jump{grid-column:1/-1;grid-row:1;min-height:34px;align-self:start}
+.lay-split .disp{display:contents}
+.lay-split .disp>.du{grid-row:2;display:flex;flex-direction:column;box-sizing:border-box;min-width:0}
+.lay-split .disp>.du:nth-child(1){grid-column:1}
+.lay-split .disp>.du:nth-child(2){grid-column:2}
+.lay-split .disp>.du svg{flex:1 1 0;min-height:0;width:100%;height:100%;max-width:none;margin:0}
+.lay-split .disp>.cdu{grid-row:2;grid-column:3;width:360px;align-self:start}
+.lay-split #ped{grid-row:2;grid-column:4;width:262px;padding:6px 8px;align-self:start}
+.lay-split #ped>.eyebrow{display:none}
+.lay-split #ped .pedrow{margin-top:0;gap:8px}
+.lay-split #help{grid-column:1/-1;grid-row:3}
 </style>
 </head><body>
 
 <div class="wrap">
   <header>
-    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.3</small></h1>
+    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.4</small></h1>
     <div class="seg" id="layseg" title="화면 배치"><button data-lay="fly">비행</button><button data-lay="split">분할</button><button data-lay="stack">세로</button></div>
     <div class="tabs" id="tabs">
       <button class="tab" data-lesson="ground">지상 (FMC·EFIS·MCP)</button>
@@ -1862,8 +1876,8 @@ window.addEventListener('resize',fitMCP);
 let LAY=null,COLS='auto',efisOpen=null,lastKey='';
 const SCRIPT_VIEW=location.hash==='#script';
 if(SCRIPT_VIEW){document.body.classList.add('view-script');document.title='787 트레이너 · 설명 창';}
-try{LAY=localStorage.getItem('b787lay');}catch(e){}
-function layMode(){if(SCRIPT_VIEW)return 'script';const m=(LAY==='fly'||LAY==='split'||LAY==='stack')?LAY:((window.innerWidth>=900&&window.innerWidth>window.innerHeight)?'fly':'stack');return (m==='split'&&scriptOpen)?'fly':m;}
+try{LAY=localStorage.getItem('b787lay2');}catch(e){}
+function layMode(){if(SCRIPT_VIEW)return 'script';const m=(LAY==='fly'||LAY==='split'||LAY==='stack')?LAY:(window.innerWidth>=700?'fly':'stack');return (m==='split'&&scriptOpen)?'fly':m;}
 function isRow(){const c=document.body.classList;return c.contains('lay-split')||c.contains('lay-fly');}
 function setBandH(){const g=$('.glare');if(g)document.documentElement.style.setProperty('--bandH',g.offsetHeight+'px');}
 function fitGlare(){
@@ -1891,7 +1905,7 @@ function applyLay(){
 }
 window.addEventListener('resize',applyLay);window.addEventListener('orientationchange',()=>setTimeout(applyLay,200));
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
-  const ly=t.closest('[data-lay]');if(ly){LAY=ly.dataset.lay;try{localStorage.setItem('b787lay',LAY);}catch(_){}applyLay();return;}
+  const ly=t.closest('[data-lay]');if(ly){LAY=ly.dataset.lay;try{localStorage.setItem('b787lay2',LAY);}catch(_){}applyLay();return;}
   const jp=t.closest('[data-jump]');if(jp){const k=jp.dataset.jump,el=k==='disp'?document.querySelector('.disp'):document.getElementById(k);if(el){const rc=$('#rcol');if(document.body.classList.contains('lay-split')&&rc){const r=rc.getBoundingClientRect(),q=el.getBoundingClientRect();rc.scrollTo({top:rc.scrollTop+(q.top-r.top)-44,behavior:'smooth'});}else el.scrollIntoView({block:'start',behavior:'smooth'});}return;}
   if(t.closest('#colbtn')){COLS=COLS==='auto'?'3':COLS==='3'?'2':'auto';applyLay();return;}
   if(t.closest('#nowbtn')){document.body.classList.toggle('now-min');const mn=document.body.classList.contains('now-min');$('#nowbtn').textContent=mn?'설명 펼치기 ▾':'설명 접기 ▴';setBandH();return;}
@@ -1990,14 +2004,20 @@ function fitFly(){
   const rc=$('#rcol');if(!rc)return;
   const du=[...rc.querySelectorAll('.disp>.du')],cdu=rc.querySelector('.disp>.cdu'),ped=$('#ped');
   const all=[...du,cdu,ped].filter(Boolean);
-  if(!document.body.classList.contains('lay-fly')){all.forEach(e=>{e.style.zoom='';e.style.width='';e.style.height='';});return;}
+  const cl=document.body.classList,fly=cl.contains('lay-fly'),spl=cl.contains('lay-split');
+  if(!fly&&!spl){all.forEach(e=>{e.style.zoom='';e.style.width='';e.style.height='';});rc.style.gridTemplateColumns='';return;}
   [cdu,ped].forEach(e=>{if(e){e.style.zoom='';e.style.height='';}});
-  const r=rc.getBoundingClientRect(),H=Math.max(180,window.innerHeight-r.top-12),W=rc.clientWidth,gap=8;
+  let H,W=rc.clientWidth;const gap=8,KC=0.85;
+  if(fly){const r=rc.getBoundingClientRect();H=Math.max(180,window.innerHeight-r.top-12);}
+  else{const jp=rc.querySelector('.jump');H=Math.max(180,rc.clientHeight-(jp?jp.offsetHeight:0)-10-14);}
   const rat=[1.0,0.95];
   const cr=cdu?cdu.offsetWidth/cdu.offsetHeight:0,pr=ped?ped.offsetWidth/ped.offsetHeight:0;
-  const R=rat[0]+rat[1]+cr+pr,h=Math.max(160,Math.min(H,(W-gap*(all.length-1))/R));
+  const R=rat[0]+rat[1]+cr*KC+pr,h=Math.max(150,Math.min(H,(W-gap*(all.length-1))/R));
   du.forEach((e,i)=>{e.style.width=Math.round(h*rat[i])+'px';e.style.height=Math.round(h)+'px';});
-  [cdu,ped].forEach(e=>{if(!e)return;const nh=e.offsetHeight;e.style.zoom=(h/nh).toFixed(4);});
+  const ws=du.map((e,i)=>Math.round(h*rat[i]));
+  if(cdu){const z=(h*KC)/cdu.offsetHeight;cdu.style.zoom=z.toFixed(4);ws.push(Math.round(cdu.offsetWidth*z));}
+  if(ped){const z=h/ped.offsetHeight;ped.style.zoom=z.toFixed(4);ws.push(Math.round(ped.offsetWidth*z));}
+  rc.style.gridTemplateColumns=spl?ws.map(w=>w+'px').join(' '):'';
 }
 /* ===== 떠 있는 설명 패널 (iPad) ===== */
 const FP={x:null,y:null,s:1};let flyTab='lesson',panelUser=null,scriptOpen=false,scriptTs=0;
