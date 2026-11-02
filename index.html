@@ -407,12 +407,13 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
 
 <div class="wrap">
   <header>
-    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.4</small></h1>
+    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.5</small></h1>
     <div class="seg" id="layseg" title="화면 배치"><button data-lay="fly">비행</button><button data-lay="split">분할</button><button data-lay="stack">세로</button></div>
     <div class="tabs" id="tabs">
       <button class="tab" data-lesson="ground">지상 (FMC·EFIS·MCP)</button>
       <button class="tab" data-lesson="takeoff">이륙 · 초기 상승</button>
       <button class="tab" data-lesson="explain">MCP 용어 실습</button>
+      <button class="tab" data-lesson="spdcmp">속도 · VNAV/FLCH 비교</button>
       <button class="tab" data-lesson="climb">상승 · 헤딩·직행·제한고도</button>
       <button class="tab" disabled>순항</button><button class="tab" data-lesson="descent">강하 · 33R</button><button class="tab" data-lesson="approach">접근 · ILS</button><button class="tab" data-lesson="ga">복행</button>
     </div>
@@ -838,6 +839,31 @@ const L_EXPLAIN=[
   ab:'A320의 HDG-V/S ↔ TRK-FPA 버튼은 한 번에 두 쌍을 바꿉니다. 787은 이 토글과 V/S ↔ FPA 토글이 서로 독립입니다.',c:()=>S.trk},
 ];
 
+const L_CMP=[
+ {t:'FMA와 속도 창 읽기 (VNAV SPD)',d:'상승 중입니다. FMA는 THR REF · LNAV · VNAV SPD이고 MCP IAS 창은 비어 있습니다. 창이 비어 있으면 FMC가 속도를 정하는 중입니다. 속도 노브에서 A/T, VNAV, FLCH로 뻗은 선은 "이 속도 값을 쓰는 기능"을 묶은 표시입니다. 배속 ×4로 4000 ft까지 올라가세요.',
+  ab:'A320의 managed 속도(FCU 창에 점)와 같은 개념입니다. 787은 점이 아니라 창이 비는 것으로 표시합니다.',c:()=>S.alt>=4000&&S.fma.pitch==='VNAV SPD'},
+ {t:'FLCH 누르기: 속도 기준이 MCP 창으로',d:'FLCH 버튼을 누르세요. 피치 칸이 FLCH SPD, 추력 칸이 THR로 바뀌고 IAS 창에 숫자가 나타납니다. FLCH는 항상 이 창의 값을 속도 목표로 씁니다. 피치가 속도를 잡으므로 추력은 상승 추력으로 고정됩니다.',
+  ab:'A320 OP CLB와 같습니다(속도는 선택, 추력은 CLB 고정). VNAV와 달리 FMC 고도 제한은 무시합니다.',c:()=>S.fma.pitch==='FLCH SPD'},
+ {t:'IAS를 220으로 낮추기',d:'IAS/MACH 노브를 돌려 220을 맞춥니다. 속도를 줄이면 피치가 올라가 상승률이 커지는 것을 PFD 수직속도에서 확인하세요. 추력은 그대로 THR입니다.',
+  ab:'FLCH에서는 추력이 일정하고 피치가 속도를 만듭니다. 속도 노브가 곧 상승률 노브처럼 작동합니다.',c:()=>S.mcp.spd===220&&S.fma.pitch==='FLCH SPD'},
+ {t:'IAS를 270으로 올리기',d:'이번에는 270으로 올립니다. 피치가 내려가고 상승률이 줄어듭니다. 같은 추력으로 속도를 얻으려면 고도 상승을 줄여야 하기 때문입니다.',
+  ab:'A320 OP CLB에서 SPD 노브를 올렸을 때와 같은 반응입니다.',c:()=>S.mcp.spd===270&&S.fma.pitch==='FLCH SPD'},
+ {t:'VNAV로 복귀: 창이 다시 비는지 확인',d:'VNAV 버튼을 누르세요. 피치 칸이 VNAV SPD로 돌아오고 IAS 창이 비며 속도는 FMC 값(10000 ft 아래 250)이 됩니다. 속도 기준이 "내 창"에서 "FMC"로 넘어갔다는 뜻입니다.',
+  ab:'A320에서 SPD 노브를 PUSH해 managed 속도로 돌아오는 것과 비슷합니다. 787은 VNAV 버튼 하나로 수직 모드와 속도 기준이 함께 바뀝니다.',c:()=>isVnav()&&S.fma.pitch==='VNAV SPD'&&!S.spdInt},
+ {t:'IAS 노브 PUSH: 속도 개입',d:'IAS/MACH 노브를 탭(PUSH)하세요. 창에 속도가 나타나지만 FMA는 여전히 VNAV SPD입니다. 수직 모드는 FMC가 맡고 속도만 내가 정하는 상태입니다.',
+  ab:'A320에서 SPD를 PULL해 selected 속도로 바꾸고 수직은 managed로 두는 것과 비슷합니다. 787은 PUSH로 열고 PUSH로 닫습니다.',c:()=>S.spdInt},
+ {t:'속도 개입 중 IAS를 220으로',d:'IAS 노브를 돌려 220을 맞춥니다. VNAV SPD는 유지되고 속도 목표만 220으로 바뀝니다. FLCH와 비교하면, FLCH는 고도 제한을 무시하지만 VNAV 속도 개입은 제한고도를 계속 지킵니다.',
+  ab:'속도만 selected로 바꾸고 경로·제한고도는 managed로 유지하는 것이 속도 개입의 목적입니다.',c:()=>S.spdInt&&S.mcp.spd===220&&isVnav()},
+ {t:'IAS 노브 PUSH로 FMC 속도 복귀',d:'노브를 한 번 더 탭하세요. 창이 다시 비고 FMC 속도로 돌아갑니다. 지금까지 본 것처럼 창에 숫자가 보이면 내 속도, 비어 있으면 FMC 속도입니다.',
+  ab:'A320 SPD 노브 PUSH(managed 속도 복귀)와 같은 개념입니다.',c:()=>!S.spdInt&&isVnav()&&S.fma.pitch==='VNAV SPD'},
+ {t:'VS/FPA 누르기: 이번엔 A/T가 속도를 잡는다',d:'VS/FPA 버튼을 누릅니다. 피치 칸이 V/S가 되고 추력 칸이 SPD로 바뀝니다. 피치가 수직속도를 맡았으므로 A/T가 MCP 속도를 유지합니다. 속도 노브에서 A/T로 뻗은 선이 이 경우입니다. 휠로 V/S를 1500으로 바꿔 속도가 유지되는지도 보세요.',
+  ab:'A320의 V/S에서 A/THR가 SPEED 모드로 속도를 유지하는 것과 같습니다. 787은 FMA 추력 칸에 SPD로 명시합니다.',c:()=>S.fma.pitch==='V/S'&&S.fma.thr==='SPD'},
+ {t:'LNAV 끄기: HDG 노브 PUSH',d:'이제 가로 방향입니다. HDG 노브를 탭하세요. 롤 칸이 LNAV에서 HDG SEL로 바뀝니다. 수직 모드와 속도는 그대로입니다. 세로와 가로 모드는 서로 독립입니다.',
+  ab:'A320의 HDG 노브 PULL(selected)과 같은 상황입니다. 방향이 PUSH라 손이 반대로 움직이지 않도록 주의하세요.',c:()=>S.fma.roll==='HDG SEL'},
+ {t:'LNAV로 복귀',d:'LNAV 버튼을 눌러 FMC 경로로 돌아갑니다. LNAV는 가로, VNAV는 세로를 FMC에 맡기는 버튼이고 FLCH는 세로를 선택 속도와 고도로 전환하는 버튼입니다.',
+  ab:'A320의 NAV / managed 수직 / open 모드에 각각 대응하지만 787은 모두 별개 버튼이라 가로·세로·속도 기준을 따로 고릅니다.',c:()=>S.fma.roll==='LNAV'},
+];
+
 const L_CLIMB=[
  {t:'LEGS 페이지에서 제한고도 확인',d:'CDU의 LEGS 키를 눌러 오른쪽 열을 보세요. BRAVO의 6000B는 "6000 ft 이하", ALPHA의 3000A와 CHRLI의 7000A는 "이상", DELTA의 10000B는 "10000 ft 이하"입니다. ND에도 웨이포인트 옆에 같은 값이 표시됩니다.',
   ab:'A320 F-PLN의 ALT CSTR과 같은 정보입니다. A320도 managed 상승 중에는 제한고도를 자동으로 지킵니다.',c:()=>C.page==='LEGS'},
@@ -937,8 +963,8 @@ const L_DES=[
  {t:'LOC · G/S 캡처',d:'FAF33 근처 3000 ft에서 G/S가 캡처됩니다. 롤 칸이 LOC, 피치 칸이 G/S(녹색)로 바뀌는지 확인하세요. 이후 기어와 플랩은 접근 레슨의 순서대로 정리하면 됩니다.',
   ab:'A320의 G/S* 캡처와 같습니다. 3000 ft에서 수평으로 아래에서 G/S를 요격하는 것이 정석입니다.',c:()=>S.flags.locCap&&S.flags.gsCap},
 ];
-const LESSONS={descent:L_DES,ground:L_GROUND,takeoff:L_TAKEOFF,explain:L_EXPLAIN,climb:L_CLIMB,approach:L_APP,ga:L_GA};
-const LNAME={descent:'강하 · RKSI 33R',ground:'지상 준비',takeoff:'이륙 · 초기 상승',explain:'MCP 용어 실습',climb:'상승 · 헤딩·직행·제한고도',approach:'접근 · ILS',ga:'복행'};
+const LESSONS={descent:L_DES,ground:L_GROUND,takeoff:L_TAKEOFF,explain:L_EXPLAIN,spdcmp:L_CMP,climb:L_CLIMB,approach:L_APP,ga:L_GA};
+const LNAME={descent:'강하 · RKSI 33R',ground:'지상 준비',takeoff:'이륙 · 초기 상승',explain:'MCP 용어 실습',spdcmp:'속도 · VNAV/FLCH 비교',climb:'상승 · 헤딩·직행·제한고도',approach:'접근 · ILS',ga:'복행'};
 
 function startLesson(id){
   newState();setILS(ILS34);lessonId=id;step=0;stepTimes=[];
@@ -947,6 +973,7 @@ function startLesson(id){
   else if(id==='descent'){presetDescent();fb('RKPC에서 RKSI로 FL280 순항 중입니다. FMA는 SPD · LNAV · VNAV PTH, 목적지 활주로는 33R입니다. 속도 버튼 ×4를 권장합니다.');}
   else if(id==='ga'){presetGA();fb('ILS RW34 최종 접근 중입니다. A/P CMD, LOC · G/S, 기어 DN, 플랩 30입니다.');}
   else if(id==='climb'){presetClimb();fb('RKSI 이륙 후 상승 중입니다. MCP는 FL150, LNAV / VNAV SPD 상태입니다.');}
+  else if(id==='spdcmp'){presetClimb();C.del.BRAVO=true;C.del.DELTA=true;fb('RKSI 이륙 후 상승 중입니다. FMA는 THR REF · LNAV · VNAV SPD이고 IAS 창은 비어 있습니다. 속도 버튼 ×4를 권장합니다.');}
   else if(id==='explain'){presetAir();fb('비행 중 상태입니다. FMA의 LNAV / VNAV ALT를 먼저 읽어 보세요.');}
   else fb('CDU IDENT 페이지부터 시작합니다.');
   document.querySelectorAll('[data-lesson]').forEach(b=>b.classList.toggle('on',b.dataset.lesson===id));
@@ -1925,6 +1952,7 @@ function lesson(){
   else if(lessonId==='approach')h=`<div class="eyebrow">완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">접근 · ILS 레슨 완료</h2><p class="stepD">APP ARM → LOC 캡처 → G/S 캡처 → 기어·플랩 정리 → 안정화 접근 → 접지 순서를 확인했습니다. 이어서 복행 레슨에서 TO/GA 조작을 연습하세요.</p>`;
   else if(lessonId==='ga')h=`<div class="eyebrow">완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">복행 레슨 완료</h2><p class="stepD">TO/GA 1회(약 2000 fpm 추력)와 2회(최대 추력), 플랩 20, 기어 UP, LNAV와 VNAV 재선택 순서를 확인했습니다.</p>`;
   else if(lessonId==='climb')h=`<div class="eyebrow">완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">상승 · 헤딩·직행·제한고도 레슨 완료</h2><p class="stepD">VNAV는 제한고도를 지키고(VNAV PTH), ALT 노브 PUSH는 다음 제한을 삭제하며, FLCH는 제한을 무시한다는 것을 확인했습니다. HDG SEL과 DIRECT TO 뒤에는 LNAV를 다시 눌러야 합니다.</p>`;
+  else if(lessonId==='spdcmp')h=`<div class="eyebrow">완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">속도 · VNAV/FLCH 비교 레슨 완료</h2><p class="stepD">정리: IAS 창이 비면 FMC 속도, 숫자가 보이면 내 속도입니다. FLCH는 항상 창 값을 쓰고 FMC 제한고도를 무시합니다. VNAV 속도 개입은 속도만 바꾸고 제한고도는 지킵니다. 피치가 속도를 잡는 모드(FLCH SPD, VNAV SPD)에서는 추력이 고정되고, 피치가 경로를 잡는 모드(V/S, ALT, VNAV PTH)에서는 A/T가 SPD로 속도를 잡습니다. 이 해석은 학습용이므로 FCOM으로 확인하세요.</p><div class="ab"><b>다음 연습</b>같은 상황을 FLCH와 VNAV로 번갈아 하며 FMA 세 칸(추력·롤·피치)을 소리 내어 읽어 보세요.</div>`;
   else if(lessonId==='explain')h=`<div class="eyebrow">완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">MCP 용어 실습 완료</h2><p class="stepD">LNAV, VNAV, FLCH, 속도 개입, HDG SEL, BANK LIMIT, V/S·FPA를 모두 눌러 봤습니다. 위의 해설 칩으로 각 버튼의 A320 대응과 FMA 표시를 복습하세요.</p>`;
   else h=`<div class="eyebrow">완료 · ${mm(S.t)}</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">이륙 · 초기 상승 레슨 완료</h2><p class="stepD">자유 연습: FLCH, V/S·FPA, HDG SEL, CDU PROG 페이지, EFIS 옵션(DATA, WPT, FPV)을 바꿔 보며 ND와 PFD 변화를 확인하세요.</p>`;
   h+=`<div class="fb"><span class="${fbMsg.c}">${fbMsg.t}</span></div>`;
