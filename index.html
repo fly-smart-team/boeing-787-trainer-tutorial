@@ -1,3 +1,5 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>787 MCP Trainer</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -320,12 +322,63 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
 .efx .lampw{width:40px;height:7px;border-radius:2px;background:#161a14;pointer-events:none;border:1px solid #2b2a30}
 .efx .lampw.on{background:#7bff3a;box-shadow:0 0 8px #7bff3a}
 .efx .cap{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#3c3b42,#111014);pointer-events:none}
+
+/* ===== v1.1 비행 화면(fly) 배치 + 설명 창 분리 ===== */
+.flyctl{display:none}
+.seg button{white-space:nowrap}
+.hbtn{padding:3px 10px;font-size:12px;border-radius:6px;border:1px solid var(--line);background:var(--panel-2,#1c2127);color:var(--muted,#aab2ba);white-space:nowrap;flex:none}
+.hbtn:hover{color:#fff}
+.lay-fly{overflow:hidden}
+.lay-fly .wrap{box-sizing:border-box;max-width:none;height:100vh;height:100dvh;padding-block:6px;gap:6px;overflow:hidden;padding-left:max(10px,env(safe-area-inset-left,0px));padding-right:max(10px,env(safe-area-inset-right,0px))}
+.lay-fly header{flex-wrap:nowrap;gap:8px 10px;flex:none;align-items:center}
+.lay-fly h1{white-space:nowrap;font-size:15px}.lay-fly h1 small{display:none}
+.lay-fly .tabs{flex-wrap:nowrap;overflow-x:auto;min-width:0;flex:1 1 auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.lay-fly .tab{white-space:nowrap;flex:none}
+.lay-fly .flyctl{display:flex;gap:6px;flex:none}
+.lay-fly .glare{flex:none;display:flex;flex-wrap:nowrap;align-items:flex-start;gap:10px}
+.lay-fly .scroll{overflow:visible;flex:none;border-radius:0}
+.lay-fly #efsizer{position:relative;overflow:hidden;border-radius:10px}
+.lay-fly #efis{position:absolute;left:0;top:0;width:470px;height:262px;transform-origin:0 0}
+.lay-fly .mcpwrap{overflow:visible;flex:none}
+.lay-fly .rcol{display:flex;flex-direction:row;justify-content:center;align-items:flex-start;gap:8px;flex:1 1 auto;min-height:0;overflow:hidden}
+.lay-fly .rcol>.jump{display:none}
+.lay-fly #help{display:none}
+.lay-fly .disp{display:contents}
+.lay-fly .disp>.du{display:flex;flex-direction:column;flex:none;box-sizing:border-box}
+.lay-fly .disp>.du svg{flex:1 1 0;min-height:0;width:100%;height:100%;max-width:none;margin:0}
+.lay-fly .disp>.cdu{flex:none;width:360px}
+.lay-fly #ped{flex:none;width:262px;padding:6px 8px}
+.lay-fly #ped>.eyebrow{display:none}
+.lay-fly #ped .pedrow{margin-top:0;gap:8px}
+.lay-fly .top{display:flex;flex-direction:column;gap:10px}
+.lay-fly .lcol>*{flex-shrink:0}
+/* 떠 있는 설명 패널 */
+#flybar{display:none}
+.lay-fly.fly-panel #flybar{display:flex;align-items:center;gap:6px;position:fixed;left:var(--fx);top:var(--fy);width:var(--fw);height:36px;z-index:61;padding:4px 6px;box-sizing:border-box;background:#232a31;border:1px solid #46505a;border-radius:10px 10px 0 0;box-shadow:0 6px 18px rgba(0,0,0,.55)}
+#flybar button{padding:3px 9px;font-size:12px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted,#aab2ba);flex:none}
+#flybar button.on{color:var(--green);border-color:var(--green)}
+#flybar .fdrag{flex:1;text-align:center;font-size:11px;color:#7d8791;cursor:grab;touch-action:none;user-select:none;padding:6px 0}
+.lay-fly:not(.fly-panel) .lcol{display:none}
+.lay-fly.fly-panel.fly-help .lcol{display:none}
+.lay-fly.fly-panel .lcol,.lay-fly.fly-panel.fly-help #help{display:flex;flex-direction:column;gap:10px;position:fixed;left:var(--fx);top:calc(var(--fy) + 36px);width:var(--fw);height:calc(var(--fh) - 36px);box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;z-index:60;background:var(--bg,#0f1317);border:1px solid #46505a;border-top:0;border-radius:0 0 10px 10px;padding:8px;box-shadow:0 10px 24px rgba(0,0,0,.6)}
+.lay-fly.fly-panel .now{max-height:none}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99;background:#222a31;border:1px solid #55616c;border-radius:10px;padding:10px 14px;font-size:14px;max-width:min(92vw,560px);box-shadow:0 8px 24px rgba(0,0,0,.6);display:none}
+#toast.show{display:block}
+/* 설명 창(분리) 모드 */
+.view-script .glare,.view-script .rcol>.jump,.view-script .rcol>.disp,.view-script #ped,.view-script header .seg,.view-script .flyctl,.view-script #detachbtn,.view-script #flybar{display:none!important}
+.view-script .wrap{max-width:980px;padding-top:10px}
+.view-script h1 small{display:none}
+.view-script .stepD{font-size:19px;line-height:1.6}.view-script .stepT{font-size:24px}
+.view-script .steps li{font-size:16px}
+#waitmsg{display:none}
+.view-script #waitmsg.show{display:block;background:#3a2f12;border:1px solid #a4832b;color:#ffe29a;border-radius:10px;padding:10px 14px;font-size:14px}
 </style>
+</head><body>
 
 <div class="wrap">
   <header>
-    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.0</small></h1>
-    <div class="seg" id="layseg" title="화면 배치"><button data-lay="split">분할</button><button data-lay="stack">세로</button></div>
+    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.1</small></h1>
+    <div class="seg" id="layseg" title="화면 배치"><button data-lay="fly">비행</button><button data-lay="split">분할</button><button data-lay="stack">세로</button></div>
     <div class="tabs" id="tabs">
       <button class="tab" data-lesson="ground">지상 (FMC·EFIS·MCP)</button>
       <button class="tab" data-lesson="takeoff">이륙 · 초기 상승</button>
@@ -333,7 +386,10 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
       <button class="tab" data-lesson="climb">상승 · 헤딩·직행·제한고도</button>
       <button class="tab" disabled>순항</button><button class="tab" data-lesson="descent">강하 · 33R</button><button class="tab" data-lesson="approach">접근 · ILS</button><button class="tab" data-lesson="ga">복행</button>
     </div>
+    <div class="flyctl"><button class="hbtn" data-act="toga">TO/GA</button><button class="hbtn" data-act="rotate">로테이트</button><button class="hbtn" data-act="pause" aria-label="일시정지/계속">⏯</button><button class="hbtn" id="panelbtn">설명 패널</button></div>
+    <button class="hbtn" id="detachbtn" title="설명을 별도 창으로 분리 (듀얼 모니터)">설명 창 분리 ⧉</button>
   </header>
+  <div id="waitmsg">비행 화면 창과 연결하는 중입니다. 이 창은 비행 화면 창의 "설명 창 분리" 버튼으로 열어야 연결됩니다.</div>
 
   <div class="lcol" id="lcol">
   <div class="top">
@@ -413,6 +469,8 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
 
 </div>
 
+<div id="flybar"><button data-flytab="lesson" class="on">설명</button><button data-flytab="help">MCP 해설</button><span class="fdrag" id="fdrag">⠿ 끌어서 이동</span><button id="fsize" aria-label="패널 크기">크기</button><button id="fclose" aria-label="패널 닫기">닫기</button></div>
+<div id="toast" role="status"></div>
 <script>
 /* ================= data ================= */
 const QNH=1009, ELEV=23, RWYH=340, FUEL=45.0, D2R=Math.PI/180, R2D=180/Math.PI;
@@ -1773,35 +1831,40 @@ function updPanels(){
 }
 
 function fitMCP(){const w=$('#mcpwrap'),z=$('#mcpsizer'),p=$('#mcp');if(!w||!z||!p)return;
-  if(document.body.classList.contains('lay-split')){fitGlare();return;}
+  if(isRow()){fitGlare();return;}
   const s=clamp((w.clientWidth-2)/1092,0.68,1.3);p.style.transform=`scale(${s})`;z.style.width=Math.round(1092*s)+'px';z.style.height=Math.round(252*s)+'px';}
 window.addEventListener('resize',fitMCP);
 
 /* ================= 화면 배치: 분할(split) / 세로(stack) ================= */
 let LAY=null,COLS='auto',efisOpen=null,lastKey='';
+const SCRIPT_VIEW=location.hash==='#script';
+if(SCRIPT_VIEW){document.body.classList.add('view-script');document.title='787 트레이너 · 설명 창';}
 try{LAY=localStorage.getItem('b787lay');}catch(e){}
-function layMode(){return LAY||(window.innerWidth>=1000?'split':'stack');}
+function layMode(){if(SCRIPT_VIEW)return 'script';if(LAY==='fly'||LAY==='split'||LAY==='stack')return LAY;return (window.innerWidth>=900&&window.innerWidth>window.innerHeight)?'fly':'stack';}
+function isRow(){const c=document.body.classList;return c.contains('lay-split')||c.contains('lay-fly');}
 function setBandH(){const g=$('.glare');if(g)document.documentElement.style.setProperty('--bandH',g.offsetHeight+'px');}
 function fitGlare(){
   const g=$('.glare'),ef=$('#efis'),efs=$('#efsizer'),w=$('#mcpwrap'),z=$('#mcpsizer'),p=$('#mcp');if(!g||!ef||!efs||!w||!z||!p)return;
-  if(!document.body.classList.contains('lay-split')){
-    ef.style.transform='';efs.style.width='';efs.style.height='';w.style.width='';w.style.flex='';fitMCP();setBandH();return;}
+  if(!isRow()){
+    ef.style.transform='';efs.style.width='';efs.style.height='';w.style.width='';w.style.flex='';fitMCP();setBandH();fitFly();return;}
   ef.style.transform='none';
   const EW=ef.offsetWidth,EH=ef.offsetHeight,gap=10,avail=g.clientWidth;
-  const sc=clamp((avail-gap)/(EW+1092),0.5,1.15);
+  let sc=clamp((avail-gap)/(EW+1092),0.5,1.15);
+  if(document.body.classList.contains('lay-fly'))sc=Math.min(sc,Math.max(0.5,window.innerHeight*0.36/EH));
   ef.style.transform='scale('+sc+')';efs.style.width=Math.round(EW*sc)+'px';efs.style.height=Math.round(EH*sc)+'px';
   w.style.width=Math.round(1092*sc)+'px';w.style.flex='none';
   p.style.transform='scale('+sc+')';z.style.width=Math.round(1092*sc)+'px';z.style.height=Math.round(252*sc)+'px';
+  fitFly();
 }
 function applyLay(){
   const m=layMode(),b=document.body;
-  b.classList.toggle('lay-split',m==='split');b.classList.toggle('lay-stack',m==='stack');
+  b.classList.toggle('lay-split',m==='split');b.classList.toggle('lay-stack',m==='stack');b.classList.toggle('lay-fly',m==='fly');
   b.classList.toggle('c3',m==='split'&&COLS==='3');b.classList.toggle('c2',m==='split'&&COLS==='2');
   b.classList.toggle('efis-off',m==='stack'&&!(efisOpen===null?false:efisOpen));
   const eb=$('#efbtn');if(eb){const open=!b.classList.contains('efis-off');eb.textContent=open?'EFIS 접기 ▴':'EFIS 펼치기 ▾';eb.setAttribute('aria-expanded',String(open));}
   document.querySelectorAll('[data-lay]').forEach(x=>x.classList.toggle('on',x.dataset.lay===m));
   const cb=$('#colbtn');if(cb)cb.textContent='열: '+({auto:'자동','3':'3열','2':'2열'}[COLS]);
-  fitGlare();
+  fitGlare();applyFly();
 }
 window.addEventListener('resize',applyLay);window.addEventListener('orientationchange',()=>setTimeout(applyLay,200));
 document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
@@ -1898,10 +1961,98 @@ document.addEventListener('keydown',e=>{
   else if(e.key==='-'){akey('+/-');}
 });
 
+
+/* ===== 비행 화면: PFD·ND·CDU·기어/플랩을 한 화면에 맞춤 ===== */
+function fitFly(){
+  const rc=$('#rcol');if(!rc)return;
+  const du=[...rc.querySelectorAll('.disp>.du')],cdu=rc.querySelector('.disp>.cdu'),ped=$('#ped');
+  const all=[...du,cdu,ped].filter(Boolean);
+  if(!document.body.classList.contains('lay-fly')){all.forEach(e=>{e.style.zoom='';e.style.width='';e.style.height='';});return;}
+  [cdu,ped].forEach(e=>{if(e){e.style.zoom='';e.style.height='';}});
+  const r=rc.getBoundingClientRect(),H=Math.max(180,window.innerHeight-r.top-12),W=rc.clientWidth,gap=8;
+  const rat=[1.0,0.95];
+  const cr=cdu?cdu.offsetWidth/cdu.offsetHeight:0,pr=ped?ped.offsetWidth/ped.offsetHeight:0;
+  const R=rat[0]+rat[1]+cr+pr,h=Math.max(160,Math.min(H,(W-gap*(all.length-1))/R));
+  du.forEach((e,i)=>{e.style.width=Math.round(h*rat[i])+'px';e.style.height=Math.round(h)+'px';});
+  [cdu,ped].forEach(e=>{if(!e)return;const nh=e.offsetHeight;e.style.zoom=(h/nh).toFixed(4);});
+}
+/* ===== 떠 있는 설명 패널 (iPad) ===== */
+const FP={x:null,y:null,s:1};let flyTab='lesson',panelUser=null,scriptOpen=false,scriptTs=0;
+try{Object.assign(FP,JSON.parse(localStorage.getItem('b787fly')||'{}'));}catch(e){}
+function saveFP(){try{localStorage.setItem('b787fly',JSON.stringify({x:FP.x,y:FP.y,s:FP.s}));}catch(e){}}
+function panelShown(){return panelUser===null?!scriptOpen:panelUser;}
+function applyFly(){
+  const b=document.body,on=b.classList.contains('lay-fly');
+  b.classList.toggle('fly-panel',on&&panelShown());b.classList.toggle('fly-help',flyTab==='help');b.classList.toggle('script-open',scriptOpen);
+  const iw=window.innerWidth,ih=window.innerHeight;
+  const W=Math.min(iw-16,[340,440,620][FP.s]),H=Math.min(ih-16,Math.round(ih*[.5,.64,.84][FP.s]));
+  let x=FP.x==null?iw-W-12:FP.x,y=FP.y==null?ih-H-12:FP.y;
+  x=clamp(x,0,Math.max(0,iw-W));y=clamp(y,0,Math.max(0,ih-60));
+  const st=document.documentElement.style;st.setProperty('--fx',x+'px');st.setProperty('--fy',y+'px');st.setProperty('--fw',W+'px');st.setProperty('--fh',H+'px');
+  document.querySelectorAll('[data-flytab]').forEach(t=>t.classList.toggle('on',t.dataset.flytab===flyTab));
+  const pb=$('#panelbtn');if(pb)pb.textContent=(on&&panelShown())?'설명 패널 닫기':'설명 패널';
+}
+let toastT=null;
+function toast(m){const t=$('#toast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),6000);}
+document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
+  const ft=t.closest('[data-flytab]');if(ft){flyTab=ft.dataset.flytab;applyFly();return;}
+  if(t.closest('#fclose')){panelUser=false;applyFly();return;}
+  if(t.closest('#panelbtn')){panelUser=!panelShown();applyFly();return;}
+  if(t.closest('#fsize')){FP.s=(FP.s+1)%3;saveFP();applyFly();return;}
+  if(t.closest('#detachbtn')){openScript();return;}
+});
+{let dg=null;const h=$('#fdrag');
+ if(h){h.addEventListener('pointerdown',e=>{e.preventDefault();const st=getComputedStyle(document.documentElement);dg={dx:e.clientX-parseFloat(st.getPropertyValue('--fx')),dy:e.clientY-parseFloat(st.getPropertyValue('--fy'))};try{h.setPointerCapture(e.pointerId);}catch(_){}});
+  h.addEventListener('pointermove',e=>{if(!dg)return;FP.x=e.clientX-dg.dx;FP.y=e.clientY-dg.dy;applyFly();});
+  const end=()=>{if(dg){dg=null;saveFP();}};h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end);}}
+/* ===== 두 창 동기화: 비행 화면 창(주) ↔ 설명 창 (BroadcastChannel) ===== */
+let bc=null;try{bc=new BroadcastChannel('b787trainer');}catch(e){}
+const mirLast={};
+function mirRoots(){return{lcol:$('#lcol'),tabs:$('#tabs'),help:$('#help')};}
+function pushMirror(force){
+  if(!bc||SCRIPT_VIEW||!scriptOpen)return;
+  const r=mirRoots(),out={};let ch=false;
+  for(const k in r){if(!r[k])continue;const h=r[k].innerHTML;if(force||h!==mirLast[k]){out[k]=h;mirLast[k]=h;ch=true;}}
+  if(ch)bc.postMessage({t:'mir',d:out});
+}
+function openScript(){
+  if(!bc){toast('이 브라우저는 창 사이 동기화(BroadcastChannel)를 지원하지 않습니다. 떠 있는 설명 패널을 쓰세요.');return;}
+  const url=location.href.split('#')[0]+'#script';let w=null;
+  try{w=window.open(url,'b787script','popup=yes,width=560,height=920');}catch(e){}
+  if(!w)toast('창을 열 수 없습니다(팝업 차단 또는 이 환경의 제한). 팝업을 허용하거나 GitHub Pages 주소에서 사용하세요. 아이패드는 설명 패널을 쓰거나, 같은 주소를 Safari 분할 보기(Split View)로 한 번 더 열고 주소 끝에 #script 를 붙이세요.');
+  else toast('설명 창을 열었습니다. 다른 모니터로 옮기세요. 조작은 이 창에서, 설명·단계 확인은 설명 창에서 합니다.');
+}
+if(bc){
+  bc.onmessage=ev=>{const m=ev.data||{};
+    if(!SCRIPT_VIEW){
+      if(m.t==='hello'){scriptTs=performance.now();if(!scriptOpen){scriptOpen=true;applyFly();pushMirror(true);}}
+      else if(m.t==='bye'){scriptOpen=false;applyFly();}
+      else if(m.t==='click'){const root=mirRoots()[m.root];let n=root;for(const i of (m.path||[])){n=n&&n.children[i];}if(n&&n.click)n.click();pushMirror(false);}
+    }else if(m.t==='mir'){
+      const r=mirRoots();for(const k in m.d){if(r[k])r[k].innerHTML=m.d[k];}
+      const w=$('#waitmsg');if(w)w.classList.remove('show');gotMir=true;
+    }};
+}
+let gotMir=false;
+if(SCRIPT_VIEW){
+  document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
+    const root=t.closest('#lcol,#tabs,#help');
+    if(root&&bc){const path=[];let n=t;while(n&&n!==root){const p=n.parentElement;if(!p)break;path.unshift(Array.prototype.indexOf.call(p.children,n));n=p;}bc.postMessage({t:'click',root:root.id,path});}
+    e.preventDefault();e.stopPropagation();
+  },true);
+  const ping=()=>{if(bc)bc.postMessage({t:'hello'});};ping();setInterval(ping,2000);
+  addEventListener('pagehide',()=>{if(bc)bc.postMessage({t:'bye'});});
+  setTimeout(()=>{if(!gotMir){const w=$('#waitmsg');if(w)w.classList.add('show');}},2500);
+}else{
+  setInterval(()=>{if(scriptOpen&&performance.now()-scriptTs>6500){scriptOpen=false;applyFly();}},2000);
+  setInterval(()=>pushMirror(false),400);
+}
+
 /* ================= boot ================= */
 buildPanels();buildCDU();buildHelp();applyLay();startLesson('ground');
 let last=performance.now(),cduTick=0;
-setInterval(()=>{const now=performance.now();let dt=Math.min(0.25,(now-last)/1000)*simSpeed;last=now;
+setInterval(()=>{if(SCRIPT_VIEW)return;const now=performance.now();let dt=Math.min(0.25,(now-last)/1000)*simSpeed;last=now;
   if(!paused){const n=Math.ceil(dt/0.05);for(let i=0;i<n;i++)tick(dt/n);checkSteps();}
   pfd();nd();eicas();updPanels();lesson();if(++cduTick%3===0)renderCDU();},100);
 </script>
+</body></html>
