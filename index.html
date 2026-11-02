@@ -229,7 +229,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
 .jump{display:none}
 .efbtn{display:none}
 .lay-split{overflow:hidden}
-.lay-split .wrap{max-width:none;height:100vh;height:100dvh;padding-block:8px;gap:8px 10px;display:grid;grid-template-columns:minmax(300px,32%) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);overflow:hidden;overflow:clip}
+.lay-split .wrap{max-width:none;height:100vh;height:100dvh;padding-block:8px;gap:8px 10px;display:grid;grid-template-columns:minmax(300px,32%) minmax(0,1fr);grid-template-rows:auto auto auto minmax(0,1fr);overflow:hidden;overflow:clip}
 .lay-split header{grid-column:1/-1;grid-row:1;flex-wrap:nowrap;gap:8px 12px}
 .lay-split h1{white-space:nowrap;font-size:16px}.lay-split h1 small{display:none}
 .lay-split .tabs{flex-wrap:nowrap;overflow-x:auto;min-width:0;flex:1 1 auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -239,7 +239,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
 .lay-split #efsizer{position:relative;overflow:hidden;border-radius:10px}
 .lay-split #efis{position:absolute;left:0;top:0;width:470px;height:262px;transform-origin:0 0}
 .lay-split .mcpwrap{overflow:visible;flex:none}
-.lay-split .lcol,.lay-split .rcol{display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;grid-row:3;padding-bottom:12px}
+.lay-split .lcol,.lay-split .rcol{display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;grid-row:4;padding-bottom:12px}
 .lay-split .lcol>*,.lay-split .rcol>*{flex-shrink:0}
 .lay-split .lcol{grid-column:1}
 .lay-split .rcol{grid-column:2;container-type:inline-size}
@@ -372,12 +372,28 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
 .view-script .steps li{font-size:16px}
 #waitmsg{display:none}
 .view-script #waitmsg.show{display:block;background:#3a2f12;border:1px solid #a4832b;color:#ffe29a;border-radius:10px;padding:10px 14px;font-size:14px}
+
+/* ===== v1.2 시뮬레이션 바(MCP 아래) + 설명 창 분리 시 계기 확장 ===== */
+.simbar{display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 10px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.simbar .sbl{font-size:11px;letter-spacing:.1em;color:var(--muted);font-family:var(--f-disp)}
+.simbar .big{padding:5px 14px;font-size:14px}
+.simbar .ghost,.simbar .seg button{font-size:13px}
+.lay-split .simbar,.lay-fly .simbar,.script-open .simbar{display:flex}
+.lay-split .simbar{grid-column:1/-1;grid-row:3}
+.lay-fly .simbar{flex:none}
+.lay-split .top>.card:not(.now),.lay-fly .top>.card:not(.now){display:none}
+.lay-split.script-open .wrap{grid-template-columns:minmax(0,1fr)}
+.lay-split.script-open .lcol{display:none}
+.lay-split.script-open .rcol{grid-column:1/-1}
+.lay-stack.script-open .lcol{display:none}
+.lay-stack.script-open .simbar{order:1}
+.view-script .simbar{display:none!important}
 </style>
 </head><body>
 
 <div class="wrap">
   <header>
-    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.1</small></h1>
+    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.2</small></h1>
     <div class="seg" id="layseg" title="화면 배치"><button data-lay="fly">비행</button><button data-lay="split">분할</button><button data-lay="stack">세로</button></div>
     <div class="tabs" id="tabs">
       <button class="tab" data-lesson="ground">지상 (FMC·EFIS·MCP)</button>
@@ -386,7 +402,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
       <button class="tab" data-lesson="climb">상승 · 헤딩·직행·제한고도</button>
       <button class="tab" disabled>순항</button><button class="tab" data-lesson="descent">강하 · 33R</button><button class="tab" data-lesson="approach">접근 · ILS</button><button class="tab" data-lesson="ga">복행</button>
     </div>
-    <div class="flyctl"><button class="hbtn" data-act="toga">TO/GA</button><button class="hbtn" data-act="rotate">로테이트</button><button class="hbtn" data-act="pause" aria-label="일시정지/계속">⏯</button><button class="hbtn" id="panelbtn">설명 패널</button></div>
+    <div class="flyctl"><button class="hbtn" id="panelbtn">설명 패널</button></div>
     <button class="hbtn" id="detachbtn" title="설명을 별도 창으로 분리 (듀얼 모니터)">설명 창 분리 ⧉</button>
   </header>
   <div id="waitmsg">비행 화면 창과 연결하는 중입니다. 이 창은 비행 화면 창의 "설명 창 분리" 버튼으로 열어야 연결됩니다.</div>
@@ -402,7 +418,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
       </div>
       <div class="ctlrow" style="margin-top:8px">
         <div class="seg" id="speed"><button data-sp="1" class="on">×1</button><button data-sp="2">×2</button><button data-sp="4">×4</button></div>
-        <button class="ghost" data-act="pause" id="pauseBtn">일시정지</button>
+        <button class="ghost pausebtn" data-act="pause" id="pauseBtn">일시정지</button>
         <button class="ghost" data-act="reset">레슨 다시 시작</button>
       </div>
       <p class="note">RKSI RW34L, 가상 항로 PRAC01 (교육용 데이터). 강하 레슨은 RKPC → RKSI RW33R 가상 STAR(INDIA → JULET → KILOO → LIMAA → FAF33)이며 실제 절차가 아닙니다. 노브는 돌리듯 드래그하고, 탭하면 PUSH입니다. CDU는 iPad 키보드로도 입력됩니다.</p>
@@ -420,6 +436,13 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
     <div class="scroll" id="efsWrap"><div id="efsizer"><div class="efx" id="efis"></div></div></div>
     <div class="mcpwrap" id="mcpwrap"><div class="mcpsizer" id="mcpsizer"><div class="mcpx" id="mcp"></div></div></div>
   </section>
+  <div class="simbar" id="simbar" aria-label="추력 레버 · 요크 · 시뮬레이션">
+    <span class="sbl">추력 레버 · 요크</span>
+    <button class="big toga" data-act="toga">TO/GA</button><button class="big rot" data-act="rotate">로테이트</button>
+    <span class="sbl">시뮬레이션</span>
+    <div class="seg"><button data-sp="1" class="on">×1</button><button data-sp="2">×2</button><button data-sp="4">×4</button></div>
+    <button class="ghost pausebtn" data-act="pause">일시정지</button><button class="ghost" data-act="reset">레슨 다시 시작</button>
+  </div>
 
   <div class="rcol" id="rcol">
     <div class="jump" id="jump">
@@ -1181,7 +1204,7 @@ function act(a){
   case 'bank':{const b=['AUTO','5','10','15','20','25'];S.bank=b[(b.indexOf(S.bank)+1)%b.length];break;}
   case 'efisOpt':break;
   case 'ctr':E.ctr=!E.ctr;break;
-  case 'pause':paused=!paused;$('#pauseBtn').textContent=paused?'계속':'일시정지';break;
+  case 'pause':paused=!paused;document.querySelectorAll('.pausebtn').forEach(x=>x.textContent=paused?'계속':'일시정지');break;
   case 'reset':startLesson(lessonId);return;
   case 'cont':continueToTakeoff();break;
   }
