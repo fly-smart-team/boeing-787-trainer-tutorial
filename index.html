@@ -393,7 +393,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-o
 
 <div class="wrap">
   <header>
-    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.2</small></h1>
+    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.3</small></h1>
     <div class="seg" id="layseg" title="화면 배치"><button data-lay="fly">비행</button><button data-lay="split">분할</button><button data-lay="stack">세로</button></div>
     <div class="tabs" id="tabs">
       <button class="tab" data-lesson="ground">지상 (FMC·EFIS·MCP)</button>
@@ -1863,7 +1863,7 @@ let LAY=null,COLS='auto',efisOpen=null,lastKey='';
 const SCRIPT_VIEW=location.hash==='#script';
 if(SCRIPT_VIEW){document.body.classList.add('view-script');document.title='787 트레이너 · 설명 창';}
 try{LAY=localStorage.getItem('b787lay');}catch(e){}
-function layMode(){if(SCRIPT_VIEW)return 'script';if(LAY==='fly'||LAY==='split'||LAY==='stack')return LAY;return (window.innerWidth>=900&&window.innerWidth>window.innerHeight)?'fly':'stack';}
+function layMode(){if(SCRIPT_VIEW)return 'script';const m=(LAY==='fly'||LAY==='split'||LAY==='stack')?LAY:((window.innerWidth>=900&&window.innerWidth>window.innerHeight)?'fly':'stack');return (m==='split'&&scriptOpen)?'fly':m;}
 function isRow(){const c=document.body.classList;return c.contains('lay-split')||c.contains('lay-fly');}
 function setBandH(){const g=$('.glare');if(g)document.documentElement.style.setProperty('--bandH',g.offsetHeight+'px');}
 function fitGlare(){
@@ -2048,8 +2048,8 @@ function openScript(){
 if(bc){
   bc.onmessage=ev=>{const m=ev.data||{};
     if(!SCRIPT_VIEW){
-      if(m.t==='hello'){scriptTs=performance.now();if(!scriptOpen){scriptOpen=true;applyFly();pushMirror(true);}}
-      else if(m.t==='bye'){scriptOpen=false;applyFly();}
+      if(m.t==='hello'){scriptTs=performance.now();if(!scriptOpen){scriptOpen=true;applyLay();pushMirror(true);}}
+      else if(m.t==='bye'){scriptOpen=false;applyLay();}
       else if(m.t==='click'){const root=mirRoots()[m.root];let n=root;for(const i of (m.path||[])){n=n&&n.children[i];}if(n&&n.click)n.click();pushMirror(false);}
     }else if(m.t==='mir'){
       const r=mirRoots();for(const k in m.d){if(r[k])r[k].innerHTML=m.d[k];}
@@ -2067,7 +2067,7 @@ if(SCRIPT_VIEW){
   addEventListener('pagehide',()=>{if(bc)bc.postMessage({t:'bye'});});
   setTimeout(()=>{if(!gotMir){const w=$('#waitmsg');if(w)w.classList.add('show');}},2500);
 }else{
-  setInterval(()=>{if(scriptOpen&&performance.now()-scriptTs>6500){scriptOpen=false;applyFly();}},2000);
+  setInterval(()=>{if(scriptOpen&&performance.now()-scriptTs>6500){scriptOpen=false;applyLay();}},2000);
   setInterval(()=>pushMirror(false),400);
 }
 
