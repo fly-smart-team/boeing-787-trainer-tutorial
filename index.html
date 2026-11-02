@@ -1,0 +1,1907 @@
+<title>787 MCP Trainer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=B612+Mono:wght@400;700&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: flight-deck order. Lesson strip on top, glareshield (EFIS + MCP) next, then PFD | ND | CDU, then step log. Single dark cockpit theme. */
+:root{
+  color-scheme: dark;
+  --bg:#121518; --panel:#1f2327; --panel-2:#2a2f35; --line:#363c44;
+  --fg:#e7eaee; --muted:#98a1ab;
+  --glare:#3b4046; --glare-2:#31353a; --legend:#eef1f4; --lamp:#dfffe9;
+  --green:#3fe08a; --magenta:#ff5ce1; --amber:#ffb340; --cyan:#5fd4ff;
+  --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+  --f-disp:"B612 Mono","SFMono-Regular",Menlo,Consolas,monospace;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-ui);font-size:15px;line-height:1.5}
+.wrap{max-width:1360px;margin:0 auto;padding-block:14px 40px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+h1{font-family:var(--f-disp);font-size:19px;margin:0;letter-spacing:.04em}
+h1 small{color:var(--muted);font-family:var(--f-ui);font-size:13px;font-weight:400;letter-spacing:0;margin-left:6px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tab{font:inherit;font-size:12px;padding:4px 11px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:transparent}
+.tab.on{border-color:var(--green);color:var(--green)}
+.tab[disabled]{opacity:.45;cursor:default}
+button{font:inherit;color:inherit;touch-action:manipulation;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible,.knob:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-family:var(--f-disp)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+
+/* lesson strip */
+.top{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:900px){.top{grid-template-columns:minmax(0,1fr) 340px}}
+.now{min-width:0}
+.prog{height:4px;background:var(--panel-2);border-radius:2px;margin:6px 0 10px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--green);transition:width .3s}
+.stepT{font-size:18px;font-weight:700;margin:0 0 4px;text-wrap:balance}
+.stepD{margin:0 0 8px}
+.ab{border-left:3px solid var(--cyan);background:rgba(95,212,255,.07);padding:7px 11px;border-radius:0 6px 6px 0;font-size:14px;color:#cfe9f5}
+.ab b{color:var(--cyan);font-weight:500;font-size:12px;letter-spacing:.06em;display:block}
+.fb{margin-top:8px;min-height:22px;font-size:14px}
+.warn{color:var(--amber)} .ok{color:var(--green)}
+.next{margin-top:8px;background:var(--green);color:#062113;border:0;border-radius:8px;padding:8px 14px;font-weight:700}
+.ctlrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.big{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:9px 14px;font-weight:700;font-size:14px}
+.big.toga{background:#3a3020;border-color:#7a6230;color:#ffd58a}
+.big.rot{background:#203330;border-color:#2f6b5d;color:#9fffe0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:7px 10px;font-family:var(--f-disp);font-size:12px;color:var(--muted)}
+.seg button.on{background:var(--panel-2);color:var(--fg)}
+.ghost{background:transparent;border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:13px;color:var(--muted)}
+.note{font-size:12px;color:var(--muted);margin:8px 0 0}
+
+/* glareshield */
+.glare{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+.scroll{overflow-x:auto;min-width:0;max-width:100%;-webkit-overflow-scrolling:touch;border-radius:10px}
+.pnl{background:linear-gradient(var(--glare),var(--glare-2));border:1px solid #4b5158;border-radius:10px;padding:10px 12px 12px;display:flex;gap:10px;align-items:stretch;box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 2px 0 #0a0c0e}
+.mcp787{width:max-content}
+.sec{display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 8px;border-left:1px solid rgba(255,255,255,.07)}
+.sec:first-child{border-left:0}
+.lbl{font-family:var(--f-disp);font-size:10px;letter-spacing:.08em;color:var(--legend);white-space:nowrap;text-align:center}
+.lbl.dim{color:#aab2ba}
+.row{display:flex;gap:8px;align-items:center}
+.col{display:flex;flex-direction:column;gap:8px;align-items:center}
+.mb{width:56px;height:44px;padding:0;background:#24282d;border:1px solid #5b636c;border-radius:4px;font-family:var(--f-disp);font-size:10px;font-weight:700;color:var(--legend);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;line-height:1.1;box-shadow:0 2px 0 #111}
+.mb::before{content:"";display:block;width:34px;height:4px;border-radius:1px;background:#3a3f45}
+.mb.lit::before{background:var(--lamp);box-shadow:0 0 7px var(--lamp)}
+.mb:active{transform:translateY(1px);box-shadow:0 1px 0 #111}
+.mb.sm{width:46px;height:34px;font-size:9px}
+.mb.sm::before{width:24px;height:3px}
+.ref{width:46px;height:30px;padding:0;background:#24282d;border:1px solid #5b636c;border-radius:4px;font-family:var(--f-disp);font-size:8px;color:var(--legend);line-height:1.1}
+.tog{width:22px;height:46px;border-radius:11px;background:#14171a;border:1px solid #5b636c;position:relative;padding:0}
+.tog i{position:absolute;left:3px;width:14px;height:18px;border-radius:5px;background:linear-gradient(#cfd5db,#8d959e);bottom:3px;transition:bottom .12s}
+.tog.on i{bottom:23px}
+.togpos{display:flex;flex-direction:column;justify-content:space-between;height:46px;font-family:var(--f-disp);font-size:8px;color:#aab2ba}
+.win{font-family:var(--f-disp);font-size:19px;background:#050607;color:#f4f4f4;border:1px solid #2b2f33;border-radius:3px;padding:3px 6px;min-width:76px;height:32px;text-align:right;font-variant-numeric:tabular-nums;box-shadow:inset 0 0 6px #000}
+.win.narrow{min-width:62px}
+.wl{display:flex;justify-content:space-between;width:100%;gap:8px}
+.wl span{font-family:var(--f-disp);font-size:9px;color:#6d757e}
+.wl span.on{color:var(--legend)}
+.knob{width:48px;height:48px;border-radius:50%;position:relative;cursor:grab;touch-action:none;
+  background:repeating-conic-gradient(#1b1e21 0 5deg,#3c4248 5deg 10deg);box-shadow:0 3px 0 #0b0d0f,0 0 0 2px #22262a}
+.knob::after{content:"";position:absolute;inset:7px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#5a6168,#262a2e 70%)}
+.knob .dot{position:absolute;inset:0;z-index:1;pointer-events:none}
+.knob .dot::before{content:"";position:absolute;left:50%;top:9px;width:3px;height:9px;margin-left:-1.5px;border-radius:2px;background:#e9edf0}
+.knob.sm{width:40px;height:40px}
+.knob.sm .dot::before{top:7px;height:7px}
+.kpm{display:flex;gap:3px}
+.kpm button{width:26px;height:20px;padding:0;background:#24282d;border:1px solid #4d545c;border-radius:3px;font-family:var(--f-disp);font-size:10px;color:#cfd5dc}
+.wheel{width:26px;height:56px;border-radius:5px;touch-action:none;cursor:ns-resize;
+  background:repeating-linear-gradient(#1a1d20 0 3px,#4a5057 3px 6px);border:1px solid #5b636c;box-shadow:inset 0 6px 8px #000,inset 0 -6px 8px #000}
+.wheelwrap{display:flex;align-items:center;gap:4px}
+.wheelwrap .togpos{height:56px}
+.disc{width:120px;height:18px;padding:0;background:linear-gradient(#cfd5db,#8d959e);border:1px solid #2a2e33;border-radius:3px;font-family:var(--f-disp);font-size:8px;font-weight:700;color:#1c1f22}
+.disc.down{background:linear-gradient(#e2c56b,#a48733)}
+.sel{display:flex;gap:2px}
+.sel button{padding:2px 4px;background:#24282d;border:1px solid #4d545c;border-radius:3px;font-family:var(--f-disp);font-size:8px;color:#8f98a1}
+.sel button.on{color:var(--legend);border-color:var(--legend)}
+.efis .optgrid{display:grid;grid-template-columns:repeat(4,46px);gap:6px}
+
+/* 787 MCP — fixed 1090×250 drawing scaled to fit */
+.mcpwrap{flex:1 1 100%;overflow-x:auto;max-width:100%;min-width:0;-webkit-overflow-scrolling:touch}
+.mcpsizer{position:relative;margin:0 auto}
+.mcpx{position:absolute;left:0;top:0;width:1090px;height:250px;transform-origin:0 0;border-radius:6px;
+  background:linear-gradient(180deg,#43484e 0%,#3a3e43 60%,#34383c 100%);border:1px solid #5a6067;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -2px 0 rgba(0,0,0,.35),0 3px 0 #0b0d0f}
+.mcpx>*{position:absolute;transform:translate(-50%,-50%)}
+.mcpx>svg.deco{transform:none;left:0;top:0;pointer-events:none}
+.mcpx .t{font-family:Arial,"Helvetica Neue",var(--f-ui);font-size:11.5px;font-weight:700;color:#f3f3f3;white-space:nowrap;letter-spacing:.02em;line-height:1.1;text-align:center;pointer-events:none}
+.mcpx .t.sm{font-size:10px}
+.pb{width:38px;height:27px;padding:0;border-radius:3px;background:#0c0e10;border:1px solid #23272b;box-shadow:inset 0 0 0 2px #191c1f,0 1px 0 rgba(255,255,255,.12)}
+.pb::before{content:"";position:absolute;left:10px;right:10px;top:8px;height:10px;background:repeating-linear-gradient(#41464c 0 2px,transparent 2px 4px)}
+.pb.lit::before{background:repeating-linear-gradient(var(--lamp) 0 2px,transparent 2px 4px);filter:drop-shadow(0 0 3px var(--lamp))}
+.pb:active{box-shadow:inset 0 0 0 2px #191c1f,inset 0 2px 4px #000}
+.lcd{background:#050607;border:1px solid #16191c;border-radius:2px;box-shadow:inset 0 0 10px #000}
+.lcd .m{position:absolute;left:6px;font:9px var(--f-disp);color:#30353a;line-height:1}
+.lcd .m.on{color:#d6dbe0}
+.lcd .v{position:absolute;right:8px;bottom:5px;font:700 27px var(--f-disp);color:#f4f4f4;font-variant-numeric:tabular-nums;line-height:1}
+.xfr{width:26px;height:26px;padding:0;border-radius:50%;border:0;background:radial-gradient(circle,#101214 52%,#b9c0c6 56%,#6a7178 72%,#3a3f44 100%)}
+.xfr:active{background:radial-gradient(circle,#1d2124 52%,#b9c0c6 56%,#6a7178 72%,#3a3f44 100%)}
+.screw{width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#2a2e32,#0e1012);pointer-events:none}
+.lamp{width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffffff,#d9dcdf 60%,#9aa0a6);pointer-events:none}
+.rt{width:22px;height:22px;padding:0;border-radius:50%;background:radial-gradient(circle,#0b0d0f 55%,#2a2e33 60%,#0b0d0f);border:1px solid #555b62}
+.rt i{position:absolute;left:50%;top:50%;width:4px;height:12px;margin:-11px 0 0 -2px;border-radius:2px;background:linear-gradient(#e6e9ec,#8a9198);transform-origin:50% 100%;transform:rotate(-40deg);transition:transform .12s}
+.rt.on i{transform:rotate(40deg)}
+.mcpx .tog{border:0;padding:0;background:transparent}
+.fdt{width:38px;height:38px;border-radius:50%;background:radial-gradient(circle,#0c0e10 44%,#9aa1a8 48%,#d8dde1 56%,#6c737a 66%,#3b4045 100%)!important}
+.fdt i{position:absolute;left:50%;width:7px;height:14px;margin-left:-3.5px;border-radius:3px;background:linear-gradient(#f0f2f4,#8d949b);top:16px;bottom:auto!important;transition:top .12s}
+.fdt.on i{top:6px}
+.att{width:20px;height:36px;border-radius:4px;background:#0c0e10!important;box-shadow:inset 0 0 0 2px #1d2024}
+.att i{position:absolute;left:5px;width:10px;height:15px;border-radius:3px;background:linear-gradient(#e8d9a6,#9c8a52);top:17px;bottom:auto!important;transition:top .12s}
+.att.on i{top:4px}
+.mcpx .knob{width:50px;height:50px;background:repeating-conic-gradient(#c9ced3 0 6deg,#eef1f3 6deg 12deg);box-shadow:0 3px 0 #15181b,0 0 0 2px #2b2f33,0 4px 8px rgba(0,0,0,.5)}
+.mcpx .knob::after{inset:9px;background:radial-gradient(circle at 38% 32%,#ffffff,#d5dade 55%,#a8afb5)}
+.mcpx .knob .dot::before{background:#3a3f44;top:5px}
+.mcpx .knob.big{width:56px;height:56px}
+.mcpx .knob .sel{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.mcpx .knob .sel b{width:26px;height:26px;border-radius:50%;background:#15181b;color:#f2f2f2;font:700 9px Arial,sans-serif;display:flex;align-items:center;justify-content:center}
+.wheel787{width:28px;height:104px;border-radius:6px;touch-action:none;cursor:ns-resize;border:1px solid #2a2e33;
+  background:repeating-linear-gradient(#8c939a 0 3px,#e3e7ea 3px 7px);box-shadow:inset 0 14px 12px rgba(0,0,0,.7),inset 0 -14px 12px rgba(0,0,0,.7)}
+.disc787{width:72px;height:24px;padding:0;border:0;border-radius:2px;background:repeating-linear-gradient(135deg,#f2f2f2 0 6px,#1a1d20 6px 12px);box-shadow:0 2px 0 #0b0d0f}
+.disc787.down{background:repeating-linear-gradient(135deg,#f0c75a 0 6px,#1a1d20 6px 12px);box-shadow:inset 0 2px 3px #000}
+.lab{padding:1px 2px;border:0;background:transparent;font:700 10px Arial,sans-serif;color:#7d848b;line-height:1}
+.lab.on{color:#ffffff;text-shadow:0 0 4px rgba(255,255,255,.4)}
+.lab.tick{width:12px;height:12px;border-radius:50%;padding:0}
+.lab.tick::after{content:"";position:absolute;left:4px;top:4px;width:4px;height:4px;border-radius:50%;background:#6d747b}
+.lab.tick.on::after{background:#fff}
+
+/* gear / flaps */
+.pedrow{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;margin-top:8px}
+.lv{display:flex;flex-direction:column;align-items:center;gap:6px}
+.lbl2{font-family:var(--f-disp);font-size:10px;letter-spacing:.1em;color:var(--muted)}
+.flapcol{display:flex;flex-direction:column;gap:3px;padding:6px;background:linear-gradient(var(--glare),var(--glare-2));border:1px solid #4b5158;border-radius:8px}
+.det{width:78px;height:28px;padding:0 0 0 10px;text-align:left;background:#24282d;border:1px solid #4d545c;border-radius:4px;font-family:var(--f-disp);font-size:12px;font-weight:700;color:#aab2ba;position:relative}
+.det.on{color:#fff;border-color:#e8ebee;background:#33383e}
+.det.on::after{content:"";position:absolute;right:6px;top:5px;width:30px;height:16px;border-radius:8px;background:linear-gradient(#e9ecef,#98a0a8);box-shadow:0 2px 0 #0b0d0f}
+.gearbox{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;background:linear-gradient(var(--glare),var(--glare-2));border:1px solid #4b5158;border-radius:8px}
+.gb{width:64px;height:26px;padding:0;background:#24282d;border:1px solid #4d545c;border-radius:4px;font-family:var(--f-disp);font-size:12px;font-weight:700;color:#aab2ba}
+.gb.on{color:#fff;border-color:#e8ebee}
+.gtrack{position:relative;width:64px;height:112px;background:#15181b;border:1px solid #4d545c;border-radius:6px;cursor:pointer}
+.gknob{position:absolute;left:12px;width:40px;height:40px;border-radius:50%;background:radial-gradient(circle at 38% 32%,#f7f8f9,#aab1b8 60%,#6d747b);box-shadow:0 3px 0 #0b0d0f;transition:top .2s;pointer-events:none}
+.ei{flex:1 1 300px;max-width:420px;padding:4px}
+.ei svg{max-width:100%}
+/* help */
+.help{display:flex;flex-direction:column;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted)}
+.chip.on{border-color:var(--cyan);color:var(--cyan);background:rgba(95,212,255,.08)}
+.hb{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:820px){.hb{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.hb h3{margin:0;font-size:18px;font-family:var(--f-disp);letter-spacing:.03em}
+.hb .one{grid-column:1/-1;font-size:15px}
+.hb .it{background:var(--panel-2);border-radius:8px;padding:8px 11px;font-size:14px;min-width:0}
+.hb .it b{display:block;font-size:11px;letter-spacing:.08em;margin-bottom:2px;font-weight:500}
+.hb .it.ab2{border-left:3px solid var(--cyan)} .hb .it.ab2 b{color:var(--cyan)}
+.hb .it.fm b{color:var(--green)}
+.hb .it.wh b{color:var(--amber)}
+.hb .it.wn b{color:var(--muted)}
+.cmp summary{cursor:pointer;font-size:13px;color:var(--muted);padding:4px 0}
+.cmp table{border-collapse:collapse;font-size:13px;min-width:520px;width:100%;margin-top:6px}
+.cmp th,.cmp td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left}
+.cmp th{font-family:var(--f-disp);font-size:11px;color:var(--muted);font-weight:400}
+.cmp td:first-child{font-family:var(--f-disp);color:var(--green);white-space:nowrap}
+
+/* displays */
+.disp{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:760px){.disp{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1150px){.disp{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.du{background:#000;border:1px solid var(--line);border-radius:10px;padding:6px;min-width:0}
+.du svg{display:block;width:100%;height:auto;max-width:440px;margin:0 auto}
+.dutitle{font-family:var(--f-disp);font-size:10px;color:#6d757e;letter-spacing:.1em;padding:2px 4px 4px}
+
+/* CDU */
+.cdu{background:#2b2f34;border:1px solid #4b5158;border-radius:10px;padding:10px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.cdutop{display:grid;grid-template-columns:30px minmax(0,1fr) 30px;grid-template-rows:repeat(14,21px);column-gap:6px}
+.screen{grid-column:2;grid-row:1/15;background:#000;border-radius:4px;padding:2px 4px;display:grid;grid-template-rows:repeat(14,1fr);container-type:inline-size;font-family:var(--f-disp)}
+.crow{display:grid;grid-template-columns:repeat(24,1fr);align-items:center}
+.crow span{text-align:center;font-size:min(16px,5.4cqi);line-height:1;color:#f2f2f2;white-space:pre}
+.crow span.s{font-size:min(12px,4.2cqi);color:#e2e2e2}
+.crow span.m{color:var(--magenta)} .crow span.c{color:var(--cyan)} .crow span.g{color:var(--green)} .crow span.a{color:var(--amber)}
+.crow span.sc{font-size:min(12px,4.2cqi);color:var(--cyan)}
+.lsk{width:30px;height:18px;align-self:center;padding:0;background:#4a5057;border:1px solid #6b737c;border-radius:3px}
+.lsk:active{background:#646b73}
+.keys{display:flex;flex-direction:column;gap:6px}
+.fk{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.fk button,.ak button{height:32px;padding:0;background:#3f444a;border:1px solid #5d656e;border-radius:4px;font-family:var(--f-disp);font-size:9px;font-weight:700;color:#eef1f4;line-height:1.05}
+.fk button.exec{position:relative}
+.fk button.exec.lit{box-shadow:inset 0 3px 0 var(--lamp),0 0 8px rgba(223,255,233,.35)}
+.akwrap{display:grid;grid-template-columns:3fr 6fr;gap:8px}
+.ak{display:grid;gap:5px}
+.ak.num{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ak.alpha{grid-template-columns:repeat(6,minmax(0,1fr))}
+.ak button{font-size:12px;height:30px}
+
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:2px;font-size:14px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:900px){.steps{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px}}
+.steps li{display:grid;grid-template-columns:22px 1fr auto;gap:8px;padding:4px 6px;border-radius:6px;color:var(--muted)}
+.steps li.cur{background:var(--panel-2);color:var(--fg)}
+.steps li.done{color:#b9c2cb}
+.steps .k{font-family:var(--f-disp);font-size:12px;text-align:right}
+.steps li.done .k{color:var(--green)}
+.steps .tm{font-family:var(--f-disp);font-size:11px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ===== layout modes: split (iPad landscape) / stack (portrait, narrow) ===== */
+.lcol,.rcol{display:contents}
+.jump{display:none}
+.efbtn{display:none}
+.lay-split{overflow:hidden}
+.lay-split .wrap{max-width:none;height:100vh;height:100dvh;padding-block:8px;gap:8px 10px;display:grid;grid-template-columns:minmax(300px,32%) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);overflow:hidden;overflow:clip}
+.lay-split header{grid-column:1/-1;grid-row:1;flex-wrap:nowrap;gap:8px 12px}
+.lay-split h1{white-space:nowrap;font-size:16px}.lay-split h1 small{display:none}
+.lay-split .tabs{flex-wrap:nowrap;overflow-x:auto;min-width:0;flex:1 1 auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.lay-split .tab{white-space:nowrap;flex:none}
+.lay-split .glare{grid-column:1/-1;grid-row:2;flex-wrap:nowrap;align-items:flex-start;gap:10px}
+.lay-split .scroll{overflow:visible;flex:none;border-radius:0}
+.lay-split #efsizer{position:relative;overflow:hidden;border-radius:10px}
+.lay-split #efis{position:absolute;left:0;top:0;width:470px;height:262px;transform-origin:0 0}
+.lay-split .mcpwrap{overflow:visible;flex:none}
+.lay-split .lcol,.lay-split .rcol{display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;grid-row:3;padding-bottom:12px}
+.lay-split .lcol>*,.lay-split .rcol>*{flex-shrink:0}
+.lay-split .lcol{grid-column:1}
+.lay-split .rcol{grid-column:2;container-type:inline-size}
+.lay-split .top{display:flex;flex-direction:column;gap:10px}
+.lay-split .steps{grid-template-columns:minmax(0,1fr)}
+.lay-split .jump{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;position:sticky;top:0;z-index:5;background:var(--bg);padding:2px 0 6px;scrollbar-width:none}
+.lay-split .jump button{white-space:nowrap;flex:none}
+.lay-split .disp{order:1;grid-template-columns:repeat(2,minmax(0,1fr))}
+.lay-split .ped{order:2}.lay-split .help{order:3}
+.lay-split .hb{grid-template-columns:minmax(0,1fr)}
+.lay-split .disp,.lay-split .ped,.lay-split .help{scroll-margin-top:44px}
+@container (min-width:900px){.lay-split .disp{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container (min-width:760px){.lay-split .hb{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.lay-split.c3 .disp{grid-template-columns:repeat(3,minmax(0,1fr))}
+.lay-split.c2 .disp{grid-template-columns:repeat(2,minmax(0,1fr))}
+.lay-stack .top{display:contents}
+.lay-stack .glare{order:0;position:sticky;top:0;z-index:30;background:var(--bg);padding:4px 0 6px;box-shadow:0 6px 10px -4px rgba(0,0,0,.6)}
+.lay-stack .efbtn{display:inline-block;flex:1 1 40%;text-align:left;padding:3px 10px;font-size:12px}
+.lay-stack.efis-off #efsWrap{display:none}
+.lay-stack .now{order:1;position:sticky;top:var(--bandH,0px);z-index:25;max-height:26vh;overflow-y:auto}
+.lay-stack.now-min .now{max-height:64px;overflow:hidden}
+.lay-stack .top>.card:not(.now){order:2}
+.lay-stack .disp{order:3}.lay-stack .ped{order:4}.lay-stack .stepsCard{order:5}.lay-stack .help{order:6}
+@media (max-width:560px){.lay-stack .now{max-height:34vh}}
+
+/* ===== v1.0 실물 사진 기준 스킨 ===== */
+:root{--pe:#f1d2c0;--pe2:#b79d90}
+.mcpx{background:linear-gradient(180deg,#34323a 0%,#2d2b32 60%,#292730 100%);border:1px solid #4a484f}
+.mcpx .t{color:var(--pe)}
+.mcpx .t.par{font-size:27px;font-weight:300;line-height:1;letter-spacing:0}
+.pb{background:#111014;border:1px solid #232227;box-shadow:inset 0 0 0 2px #17161a,0 1px 0 rgba(255,255,255,.08)}
+.pb::before{background:repeating-linear-gradient(#33323a 0 2px,transparent 2px 4px)}
+.lcd{background:#05050a;border:1px solid #1a1a22}
+.lcd .m{color:#12131a}.lcd .m.on{color:#c4c4ff}
+.lcd .v{color:#c8c8ff}
+.xfr{width:28px;height:28px;background:radial-gradient(circle,#17161a 50%,var(--pe) 55%,#c7a898 72%,#5a4d46 100%)}
+.xfr:active{background:radial-gradient(circle,#2a292e 50%,var(--pe) 55%,#c7a898 72%,#5a4d46 100%)}
+.mcpx .knob{background:repeating-conic-gradient(#202024 0 6deg,#44444b 6deg 12deg);box-shadow:0 3px 0 #111,0 0 0 2px #1b1a1e,0 4px 8px rgba(0,0,0,.5)}
+.mcpx .knob::after{background:radial-gradient(circle at 38% 32%,#55555d,#2a2a30 60%,#19191c)}
+.mcpx .knob .dot::before{background:#e8e8f2;top:4px}
+.mcpx .knob .sel b{background:#0f0f12;color:var(--pe)}
+.rt{background:radial-gradient(circle at 40% 35%,#55555c,#1c1c20);border:1px solid #2e2d33;width:24px;height:24px}
+.rt i{width:3px;height:9px;margin:-9px 0 0 -1.5px;background:#e8e8f2}
+.fdt{width:40px;height:40px;background:radial-gradient(circle,#141317 0 50%,var(--pe) 54% 68%,#2b2a2f 72% 100%)!important}
+.fdt i{width:12px;height:12px;margin-left:-6px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#6a6a72,#232327);top:21px}
+.fdt.on i{top:7px}
+.att{width:24px;height:40px;background:#131216!important;box-shadow:inset 0 0 0 2px #2c2b31}
+.att i{left:4px;width:16px;height:16px;background:linear-gradient(#c3c3c9,#7a7a82);top:21px}
+.att.on i{top:3px}
+.lab{color:var(--pe2)}.lab.on{color:#fff}
+.disc787{width:112px;height:34px;border-radius:2px;background:linear-gradient(#bdbdc1,#8c8c91);box-shadow:inset 0 0 0 2px #a5a5aa,0 2px 0 #0b0b0d}
+.disc787.down{background:linear-gradient(#e2c56b,#a48733)}
+.lamp{width:14px;height:14px;background:radial-gradient(circle at 40% 35%,#d7d7ff,#a9a9d8 60%,#6d6d99)}
+/* EFIS — 고정 470×262 캔버스 */
+.efx{position:relative;width:470px;height:262px;border-radius:8px;
+  background:linear-gradient(180deg,#2e2c32,#27252b);border:1px solid #4a484f;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 -2px 0 rgba(0,0,0,.35),0 3px 0 #0b0b0d;
+  font-family:Arial,"Helvetica Neue",var(--f-ui);color:var(--pe)}
+.efx>*{position:absolute;transform:translate(-50%,-50%)}
+.efx>svg.deco{transform:none;left:0;top:0;pointer-events:none}
+.efx .t{font-size:10.5px;font-weight:700;color:var(--pe);white-space:nowrap;text-align:center;line-height:1.1;pointer-events:none;letter-spacing:.02em}
+.efx .t.sm{font-size:9px}.efx .t.dim{color:var(--pe2);font-weight:400}
+.efx .lb{position:absolute;transform:translate(-50%,-50%);padding:2px 3px;border:0;background:transparent;font:700 10.5px Arial,sans-serif;color:var(--pe2);line-height:1;cursor:pointer}
+.efx .lb.on{color:#fff;text-shadow:0 0 5px rgba(255,255,255,.45)}
+.efx .ring{width:68px;height:68px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,#26252a 0 46%,#4a4950 48%,#2d2c32 62%,#55545b 70%,#1d1c20 100%);box-shadow:0 3px 0 #0b0b0d}
+.efx .knob{width:44px;height:44px}
+.efx .knob.sm{width:44px;height:44px}
+.efx .eb{width:52px;height:28px;padding:0;border-radius:3px;background:#111014;border:1px solid #232227;box-shadow:inset 0 0 0 2px #17161a,0 1px 0 rgba(255,255,255,.08);font:700 10.5px Arial,sans-serif;color:var(--pe);cursor:pointer}
+.efx .eb.lit{color:#fff;border-color:#8a7c73;box-shadow:inset 0 0 0 2px #17161a,0 0 7px rgba(241,210,192,.45)}
+.efx .eb.cur{border-color:var(--pe);box-shadow:0 0 0 1px var(--pe),inset 0 0 0 2px #17161a;border-radius:6px;color:#fff}
+.efx .eb:active{transform:translate(-50%,-50%) translateY(1px)}
+.efx .rb{width:32px;height:32px;padding:0;border-radius:50%;cursor:pointer;background:radial-gradient(circle,#111014 0 50%,#3a3940 54% 62%,#16151a 66% 100%);border:1px solid #2b2a30}
+.efx .rb.lit{background:radial-gradient(circle,#111014 0 48%,var(--pe) 52% 62%,#16151a 66% 100%);box-shadow:0 0 7px rgba(241,210,192,.45)}
+.efx .chip{width:40px;height:16px;padding:0;border-radius:3px;background:#17161a;border:1px solid #2e2d34;font:700 9px Arial,sans-serif;color:var(--pe2);cursor:pointer}
+.efx .chip.lit{color:#fff;border-color:#8a7c73;box-shadow:0 0 6px rgba(241,210,192,.4)}
+.efx .pmx{display:flex;gap:3px}
+.efx .pmx button{width:26px;height:20px;padding:0;background:#17161a;border:1px solid #3a3940;border-radius:3px;color:var(--pe);font:700 12px Arial,sans-serif}
+.efx .val{font:700 10px var(--f-disp);color:#9fb4c6;white-space:nowrap;pointer-events:none}
+.efx .lampw{width:40px;height:7px;border-radius:2px;background:#161a14;pointer-events:none;border:1px solid #2b2a30}
+.efx .lampw.on{background:#7bff3a;box-shadow:0 0 8px #7bff3a}
+.efx .cap{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#3c3b42,#111014);pointer-events:none}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>787 MCP Trainer <small>A320 → B787 전환 연습 · v1.0</small></h1>
+    <div class="seg" id="layseg" title="화면 배치"><button data-lay="split">분할</button><button data-lay="stack">세로</button></div>
+    <div class="tabs" id="tabs">
+      <button class="tab" data-lesson="ground">지상 (FMC·EFIS·MCP)</button>
+      <button class="tab" data-lesson="takeoff">이륙 · 초기 상승</button>
+      <button class="tab" data-lesson="explain">MCP 용어 실습</button>
+      <button class="tab" data-lesson="climb">상승 · 헤딩·직행·제한고도</button>
+      <button class="tab" disabled>순항</button><button class="tab" data-lesson="descent">강하 · 33R</button><button class="tab" data-lesson="approach">접근 · ILS</button><button class="tab" data-lesson="ga">복행</button>
+    </div>
+  </header>
+
+  <div class="lcol" id="lcol">
+  <div class="top">
+    <section class="card now" id="now"></section>
+    <section class="card">
+      <div class="eyebrow" style="margin-bottom:8px">추력 레버 · 요크 · 시뮬레이션</div>
+      <div class="ctlrow">
+        <button class="big toga" data-act="toga">TO/GA</button>
+        <button class="big rot" data-act="rotate">로테이트</button>
+      </div>
+      <div class="ctlrow" style="margin-top:8px">
+        <div class="seg" id="speed"><button data-sp="1" class="on">×1</button><button data-sp="2">×2</button><button data-sp="4">×4</button></div>
+        <button class="ghost" data-act="pause" id="pauseBtn">일시정지</button>
+        <button class="ghost" data-act="reset">레슨 다시 시작</button>
+      </div>
+      <p class="note">RKSI RW34L, 가상 항로 PRAC01 (교육용 데이터). 강하 레슨은 RKPC → RKSI RW33R 가상 STAR(INDIA → JULET → KILOO → LIMAA → FAF33)이며 실제 절차가 아닙니다. 노브는 돌리듯 드래그하고, 탭하면 PUSH입니다. CDU는 iPad 키보드로도 입력됩니다.</p>
+    </section>
+  </div>
+  <section class="card stepsCard">
+    <div class="eyebrow">레슨 진행</div>
+    <ul class="steps" id="steps" style="margin-top:8px"></ul>
+    <p class="note">학습 보조용 단순화 모델입니다. 실제 절차, 모드 전환 조건, 속도와 수치는 회사 787 FCOM/FCTM을 기준으로 하세요. 플랩 단계와 바람은 아직 모델링하지 않았습니다.</p>
+  </section>
+  </div>
+
+  <section class="glare" aria-label="Glareshield">
+    <button class="ghost efbtn" id="efbtn" aria-expanded="false">EFIS 펼치기 ▾</button><button class="ghost efbtn" id="nowbtn">설명 접기 ▴</button>
+    <div class="scroll" id="efsWrap"><div id="efsizer"><div class="efx" id="efis"></div></div></div>
+    <div class="mcpwrap" id="mcpwrap"><div class="mcpsizer" id="mcpsizer"><div class="mcpx" id="mcp"></div></div></div>
+  </section>
+
+  <div class="rcol" id="rcol">
+    <div class="jump" id="jump">
+      <button class="ghost" data-jump="disp">PFD · ND</button><button class="ghost" data-jump="cdu">CDU</button><button class="ghost" data-jump="ped">기어 · 플랩 · EICAS</button><button class="ghost" data-jump="help">MCP 해설</button><button class="ghost" id="colbtn">열: 자동</button>
+    </div>
+  <section class="disp">
+    <div class="du"><div class="dutitle">PFD</div><svg id="pfd" viewBox="0 0 400 370" role="img" aria-label="PFD"></svg></div>
+    <div class="du"><div class="dutitle">ND</div><svg id="nd" viewBox="0 0 400 400" role="img" aria-label="ND"></svg></div>
+    <div class="cdu" id="cdu" aria-label="CDU"></div>
+  </section>
+  <section class="card ped" id="ped" aria-label="착륙장치 · 플랩 · EICAS">
+    <div class="eyebrow">착륙장치 · 플랩 레버 · EICAS (간이)</div>
+    <div class="pedrow">
+      <div class="lv"><span class="lbl2">FLAPS</span><div class="flapcol" id="flapcol">
+        <button class="det" data-flap="0" aria-label="플랩 UP">UP</button><button class="det" data-flap="1">1</button><button class="det" data-flap="5">5</button><button class="det" data-flap="15">15</button><button class="det" data-flap="20">20</button><button class="det" data-flap="25">25</button><button class="det" data-flap="30">30</button></div></div>
+      <div class="lv"><span class="lbl2">GEAR</span><div class="gearbox"><button class="gb" data-gear="UP">UP</button><div class="gtrack" data-gear-track><div class="gknob" id="gknob"></div></div><button class="gb" data-gear="DN">DN</button></div></div>
+      <div class="lv"><span class="lbl2">SPEEDBRAKE</span><div class="flapcol"><button class="det" data-act="sb" id="sbBtn" aria-label="스피드브레이크 전개 또는 수납">SPD BRK</button></div></div>
+      <div class="du ei"><svg id="eicas" viewBox="0 0 330 270" role="img" aria-label="EICAS 간이 표시"></svg></div>
+    </div>
+  </section>
+  <section class="card help" id="help" aria-label="MCP 버튼 해설">
+    <div class="eyebrow">MCP 버튼 해설 · 버튼을 누르거나 칩을 선택하세요</div>
+    <div class="chips" id="helpChips"></div>
+    <div id="helpBody"></div>
+    <details class="cmp"><summary>Boeing ↔ Airbus 모드 대응표 (1:1은 아님)</summary>
+      <div class="scroll"><table>
+        <thead><tr><th>787 (FMA)</th><th>A320 (FMA)</th><th>차이</th></tr></thead>
+        <tbody>
+        <tr><td>LNAV</td><td>NAV</td><td>787은 직접 ARM, 50 ft RA에서 활성</td></tr>
+        <tr><td>VNAV SPD</td><td>CLB / DES (managed)</td><td>속도와 상승·강하를 FMC가 관리, 추력은 THR REF</td></tr>
+        <tr><td>VNAV PTH</td><td>ALT CRZ / DES (경로)</td><td>고도 또는 경로를 유지하며 속도는 FMC</td></tr>
+        <tr><td>VNAV ALT</td><td>ALT CST / ALT</td><td>MCP 고도에서 수평 유지, ALT 노브 PUSH로 재개</td></tr>
+        <tr><td>FLCH SPD</td><td>OP CLB / OP DES</td><td>속도는 MCP 창 기준, 고도 제한 무시</td></tr>
+        <tr><td>V/S · FPA</td><td>V/S · FPA</td><td>버튼으로 진입하고 휠로 조절, 기준 전환은 별도 토글</td></tr>
+        <tr><td>HDG SEL / HOLD</td><td>HDG (selected)</td><td>노브 PUSH로 SEL, HOLD는 별도 버튼</td></tr>
+        <tr><td>플랩 마커 (UP, 1, 5…)</td><td>S 속도 · F 속도 · 그린 닷</td><td>플랩 각도 숫자와 속도 테이프 마커로 판단</td></tr>
+        <tr><td>THR REF</td><td>TOGA / FLX / CL</td><td>레버 위치가 아닌 FMA 추력 모드를 읽음</td></tr>
+        <tr><td>HOLD (추력)</td><td>없음</td><td>A/T가 레버에서 손을 뗀 상태</td></tr>
+        <tr><td>SPD (추력)</td><td>SPEED (A/THR)</td><td>A/T가 속도를 유지</td></tr>
+        </tbody></table></div>
+    </details>
+  </section>
+  </div>
+
+
+
+
+</div>
+
+<script>
+/* ================= data ================= */
+const QNH=1009, ELEV=23, RWYH=340, FUEL=45.0, D2R=Math.PI/180, R2D=180/Math.PI;
+const WP={ALPHA:{x:-2.05,y:5.64,c:'3000A'},BRAVO:{x:3.6,y:13.6,c:'6000B'},CHRLI:{x:15.5,y:19.5,c:'7000A'},DELTA:{x:30.5,y:14.5,c:'10000B'},ECHOO:{x:42,y:2.5,c:'FL150'}};
+const ILS34={T:{x:40,y:-235},hdg:340,gs:3.0,name:'RW34'};
+const ILS=Object.assign({},ILS34);
+const T33={x:1.0,y:-1.5},ILS33={T:T33,hdg:330,gs:3.0,name:'RW33R'};
+function setILS(c){ILS.T=c.T;ILS.hdg=c.hdg;ILS.gs=c.gs;ILS.name=c.name;}
+const ptT=(b,d)=>({x:+(T33.x+Math.sin(b*D2R)*d).toFixed(2),y:+(T33.y+Math.cos(b*D2R)*d).toFixed(2)});
+/* RKSI RW33R 가상 STAR (교육용 가상 데이터, 실제 절차 아님) */
+WP.INDIA=Object.assign(ptT(178,105),{c:''});WP.JULET={x:-10,y:-62,c:'14000A'};WP.KILOO=Object.assign(ptT(152,36),{c:'9000A'});
+WP.LIMAA=Object.assign(ptT(150,19),{c:'5000B'});WP.FAF33=Object.assign(ptT(150,9.2),{c:'3000A'});WP.RW33R={x:T33.x,y:T33.y,c:''};
+const STAR33=['INDIA','JULET','KILOO','LIMAA','FAF33','RW33R'];
+const GRAD=300; /* VNAV 경로 기울기 ft/NM (약 3°) */
+WP.DOGEE={x:47.52,y:-255.67,c:''};WP.FAFXX={x:43.42,y:-244.40,c:''};WP.RW34={x:40,y:-235,c:''};WP.MISAP={x:37.95,y:-229.36,c:''};
+const FIX={FOXXX:{x:-14,y:16},GOLFF:{x:16,y:-3}};
+const VORS={SKY:{x:9,y:26}};
+const APT={RKSI:{x:0.4,y:0.9},RKPC:{x:40,y:-235}};
+const CO={PRAC01:{o:'RKSI',d:'RKPC',legs:['ALPHA','BRAVO','CHRLI','DELTA','ECHOO']}};
+const RWYS=['34L','34R','33L','33R'];
+const RANGES=[5,10,20,40,80,160,320,640];
+const FLAPS=[0,1,5,15,20,25,30];
+const VMAN={0:225,1:205,5:185,15:165,20:155,25:150,30:145};   /* 교육용 가정값 (실제는 중량별) */
+const VMAX={0:340,1:255,5:235,15:225,20:210,25:190,30:180};  /* 교육용 가정값 */
+const NDMODES=['APP','VOR','MAP','PLN'];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const w180=d=>((d%360)+540)%360-180;
+const brg=(a,b)=>((Math.atan2(b.x-a.x,b.y-a.y)*R2D)+360)%360;
+const dst=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
+const $=s=>document.querySelector(s);
+
+let S,C,E,lessonId='ground',step=0,stepTimes=[],simSpeed=1,paused=false,fbMsg={t:'',c:''};
+
+function newState(){
+  S={t:0,ias:0,alt:ELEV,vs:0,pitch:0,roll:0,hdg:RWYH,x:0,y:0,gnd:true,thrust:0.15,rotating:false,
+    mcp:{spd:200,mach:0.78,hdg:100,alt:10000,vs:0,fpa:0},fdL:false,fdR:false,atL:false,atR:false,ap:false,
+    spdInt:false,machRef:false,trk:false,fpaRef:false,altInc:'AUTO',bank:'AUTO',
+    fma:{thr:'',roll:'',pitch:'',aRoll:'',aPitch:''},chg:{thr:-99,roll:-99,pitch:-99},
+    flapLever:0,flap:0,gearLever:'DN',gear:1,holdAlt:0,holdHdg:RWYH,idleT:0,pitchCmd:0,bankCmd:0,flags:{},rotWarn:false,knob:{},disc:0,cstrHold:null,gaPress:0,gaSpd:150};
+  C={page:'IDENT',pg:1,sp:'',msg:'',route:{o:'',d:'',rwy:'',co:'',flt:'',legs:[],active:false,idx:0,from:{x:0,y:0}},
+    del:{},rwyPos:null,mod:null,perf:{zfw:null,crz:null,ci:null,res:null},thr:{sel:'TO',temp:null},to:{fl:null,v1:null,vr:null,v2:null},sid:'',visited:{IDENT:true}};
+  E={baro:1013,std:false,hpa:true,mins:200,minsBaro:true,mode:'MAP',ctr:false,range:40,
+    opt:{WXR:false,STA:false,WPT:false,ARPT:true,DATA:false,POS:false,TERR:false,TFC:false,FPV:false,MTRS:false}};
+}
+const fdOn=()=>S.fdL||S.fdR, atArm=()=>S.atL||S.atR, ra=()=>S.alt-ELEV;
+const isVnav=()=>S.fma.pitch.startsWith('VNAV');
+function setMode(c,v){if(S.fma[c]!==v){S.fma[c]=v;S.chg[c]=S.t;}}
+function fb(t,c=''){fbMsg={t,c};}
+function gw(){return C.perf.zfw!=null?C.perf.zfw+FUEL:null;}
+function vcalc(){const g=gw(),f=C.to.fl;if(g==null||f==null)return null;
+  const adj={'TO':0,'TO 1':-2,'TO 2':-4}[C.thr.sel]||0;
+  const v2=Math.round(155+(g-217)*0.55-(f===15?6:f===20?9:0)+adj);return {v1:v2-10,vr:v2-5,v2};}
+const vr=()=>C.to.vr||150, v2=()=>C.to.v2||155;
+function fmtAlt(a){return a>=18000?'FL'+String(Math.round(a/100)).padStart(3,'0'):String(a);}
+function machOf(ias,alt){return ias*(1+alt/1000*0.018)/(661.5-alt*0.0021);}
+function iasOf(m,alt){return m*(661.5-alt*0.0021)/(1+alt/1000*0.018);}
+
+
+/* ================= glossary ================= */
+const GL=[
+ {id:'lnav',n:'LNAV',one:'FMC에 입력한 항로(LEGS)를 따라 옆으로 자동 비행하는 모드입니다. 버튼 하나로 켜고 끕니다.',
+  ab:'A320의 NAV(managed lateral)에 해당합니다. 다만 NAV는 항로가 있으면 이륙 시 자동으로 ARM되고, 787은 이륙 전에 LNAV를 눌러 직접 ARM합니다.',
+  fm:'지상에서 롤 칸 아래 흰색 LNAV(ARM) → 50 ft RA에서 녹색 LNAV로 활성화됩니다.',
+  wh:'이륙 전 ARM, HDG SEL로 벡터링을 받은 뒤 항로로 복귀할 때 누릅니다.',
+  wn:'EXEC하지 않은 항로(MOD 상태)는 따라가지 않습니다. 항로를 바꾸면 EXEC 뒤에야 LNAV가 새 항로를 따릅니다.'},
+ {id:'vnav',n:'VNAV',one:'FMC가 계산한 수직 프로파일과 속도를 함께 따라가는 모드입니다. 상승, 순항, 강하에 모두 씁니다.',
+  ab:'A320의 managed 수직 모드(CLB/DES/ALT CRZ)와 managed 속도를 합친 것에 가깝습니다. 모드 이름이 상황마다 바뀌는 점이 다릅니다.',
+  fm:'VNAV SPD(속도 기준으로 상승·강하), VNAV PTH(경로·고도 유지), VNAV ALT(MCP 고도에서 수평 유지). 추력은 THR REF, SPD, IDLE, HOLD가 상황에 맞게 표시됩니다.',
+  wh:'지상에서 ARM하면 400 ft RA에서 활성화됩니다. PERF INIT이 끝나야 사용할 수 있습니다.',
+  wn:'MCP 고도가 FMC 목표보다 낮으면 그 고도에서 VNAV ALT로 멈춥니다. 다시 가려면 새 고도를 설정하고 ALT 노브를 PUSH하세요.'},
+ {id:'flch',n:'FLCH (Flight Level Change)',one:'MCP 고도로 가장 직접적으로 가는 모드입니다. 추력은 상승 시 THR, 강하 시 IDLE로 정해지고, 피치가 MCP 속도를 유지합니다.',
+  ab:'A320의 OP CLB / OP DES(open mode)와 같은 개념입니다. FLCH는 항상 MCP IAS/MACH 창의 속도(selected speed)를 씁니다.',
+  fm:'추력 칸: THR(상승) 또는 IDLE → HOLD(강하). 피치 칸: FLCH SPD. 고도에 가까워지면 자동으로 ALT를 포착합니다.',
+  wh:'ATC가 고도 변경을 줬을 때 FMC 프로파일과 상관없이 빨리 가야 할 때, 강하가 늦어졌을 때 씁니다.',
+  wn:'FMC의 고도 제한과 속도 제한을 따르지 않습니다. 속도는 반드시 MCP 창을 확인하세요.'},
+ {id:'at',n:'A/T 버튼',one:'오토스로틀을 현재 AFDS 모드에 맞는 추력 모드로 연결합니다.',
+  ab:'A320의 A/THR 버튼과 역할이 비슷합니다. 레버 위치(디텐트)가 아니라 FMA 추력 모드를 읽는 방식입니다.',
+  fm:'THR REF, THR, SPD, IDLE, HOLD 등 현재 모드에 맞춰 표시됩니다.',
+  wh:'A/T가 해제된 뒤 다시 연결할 때 씁니다. 이륙 전에는 A/T ARM 스위치가 먼저 켜져 있어야 합니다.',
+  wn:'버튼의 정확한 동작 조건은 회사 FCOM으로 확인하세요. 이 트레이너는 단순화해 구현했습니다.'},
+ {id:'atarm',n:'A/T ARM L · R',one:'오토스로틀 사용을 허가하는 토글 스위치입니다. 이륙 전에 둘 다 ARM합니다.',
+  ab:'A320은 추력 레버를 FLX/TOGA 디텐트에 넣으면 A/THR가 자동으로 무장됩니다. 787은 스위치로 직접 켭니다.',
+  fm:'ARM만으로는 FMA에 아무것도 뜨지 않습니다. TO/GA를 누르면 THR REF가 나타납니다.',
+  wh:'이륙 전 점검, 착륙 후 정리 때 조작합니다.',
+  wn:'OFF 상태에서 TO/GA를 눌러도 A/T가 추력을 올려 주지 않습니다.'},
+ {id:'clbcon',n:'CLB/CON',one:'추력 제한 모드를 CLB(상승 추력)와 CON(최대 연속 추력) 사이에서 선택하는 버튼입니다.',
+  ab:'A320에서는 레버를 CL 디텐트로 당기는 동작이 상승 추력 선택이었는데, 787은 대부분 자동으로 전환되어 누를 일이 적습니다.',
+  fm:'추력 제한 모드가 CDU THRUST LIM과 EICAS 추력 기준에 반영됩니다.',
+  wh:'평소에는 자동 전환에 맡기고, 절차가 요구할 때만 누릅니다.',
+  wn:'정확한 사용 시점은 회사 FCOM/FCTM으로 확인하세요.'},
+ {id:'iasmach',n:'IAS ↔ MACH 토글',one:'속도 창의 단위를 IAS(노트)와 MACH 사이에서 바꿉니다.',
+  ab:'A320 FCU의 SPD/MACH 버튼과 같습니다. 787 MCP는 창 위쪽의 작은 둥근 토글입니다.',
+  fm:'PFD 속도 창 위의 자홍색 숫자가 노트 또는 마하로 바뀝니다.',
+  wh:'순항 고도 근처에서 마하 속도로 비행할 때 씁니다.',
+  wn:'VNAV 중에는 FMC가 단위를 자동으로 관리합니다.'},
+ {id:'spdknob',n:'IAS/MACH 창 · 노브',one:'속도를 직접 정하는 창과 노브입니다. VNAV 상승·강하 중에는 창이 비어(닫혀) 있고 FMC가 속도를 관리합니다.',
+  ab:'A320 FCU SPD 창의 대시(managed 속도)와 같은 개념입니다. 단, PULL로 selected를 만드는 대신 787은 노브 PUSH로 속도 개입을 엽니다.',
+  fm:'VNAV SPD에서는 창이 비어 있습니다. 창에 숫자가 있으면 그 속도를 쓰는 중입니다.',
+  wh:'FLCH, V/S 등 selected 모드에서 속도를 정할 때 돌립니다.',
+  wn:'VNAV 중에는 노브를 돌려도 반응하지 않습니다. 먼저 PUSH하세요.'},
+ {id:'spdint',n:'속도 개입 (Speed Intervention)',one:'VNAV를 유지한 채 속도만 직접 정하는 기능입니다. IAS/MACH 노브를 PUSH하면 창이 열리고, 다시 PUSH하면 FMC 속도로 돌아갑니다.',
+  ab:'A320은 SPD 노브 PULL(selected speed)이지만 수직 모드는 managed를 유지할 수 있는 점이 비슷합니다. 787은 PUSH로 열고 닫습니다.',
+  fm:'FMA는 VNAV SPD 그대로이고 MCP 속도 창에 숫자가 나타납니다.',
+  wh:'ATC가 속도 지시를 줬을 때(예: 230 kt 유지) 가장 자주 씁니다.',
+  wn:'다시 PUSH해서 닫지 않으면 이후 속도 제한도 FMC가 아닌 MCP 값을 따릅니다.'},
+ {id:'hdg',n:'HDG 노브 · SEL',one:'돌려서 방위를 정하고, PUSH하면 HDG SEL이 연결됩니다.',
+  ab:'A320 FCU HDG 노브에서는 PULL이 selected, PUSH가 managed입니다. 787은 PUSH가 HDG SEL이고, 다시 항로로 가려면 LNAV 버튼을 누릅니다.',
+  fm:'롤 칸에 HDG SEL이 표시되고 ND에 자홍색 점선(선택 방위선)이 나타납니다.',
+  wh:'ATC 레이더 벡터를 받을 때 사용합니다.',
+  wn:'방위만 돌리고 PUSH하지 않으면 비행기는 움직이지 않습니다.'},
+ {id:'bank',n:'BANK LIMIT',one:'HDG SEL/TRK SEL 동안의 최대 뱅크각을 AUTO, 10, 15, 20, 25, 30 중에서 정합니다.',
+  ab:'A320에는 조종사가 고르는 뱅크 제한이 없습니다. 787 고유 항목입니다.',
+  fm:'FMA에는 표시되지 않고, 선택한 뱅크각만큼만 선회합니다.',
+  wh:'승객 편의나 저속 선회, 좁은 공역에서 뱅크를 줄이고 싶을 때 씁니다.',
+  wn:'LNAV에는 영향을 주지 않습니다(HDG SEL/TRK SEL 때만 적용).'},
+ {id:'hdgtrk',n:'HDG ↔ TRK 토글',one:'방위 기준을 기수 방향(HDG)과 항적(TRK) 사이에서 바꿉니다.',
+  ab:'A320 FCU의 HDG-V/S ↔ TRK-FPA 버튼은 두 쌍을 한꺼번에 바꿉니다. 787은 HDG/TRK와 V/S/FPA가 서로 독립 토글입니다.',
+  fm:'PFD 방위 표시 아래 HDG 또는 TRK 글자가 바뀝니다.',
+  wh:'바람이 강한 구간에서 항적 기준으로 비행할 때 씁니다.',
+  wn:'두 토글을 따로 눌러야 하니 둘 다 확인하세요.'},
+ {id:'hdghold',n:'HDG HOLD',one:'현재 방위를 그대로 유지합니다.',
+  ab:'A320에는 별도 버튼이 없고 HDG를 PULL한 상태에서 노브를 돌리지 않는 것과 비슷합니다.',
+  fm:'롤 칸에 HDG HOLD가 표시됩니다.',
+  wh:'방위를 맞추기 전에 일단 현재 방향을 고정할 때 씁니다.',
+  wn:'바람에 흘러가도 기수 방위를 유지하므로 항적은 달라질 수 있습니다.'},
+ {id:'vsfpa',n:'V/S · FPA',one:'수직속도(또는 비행경로각)로 상승·강하합니다. VS/FPA 버튼을 눌러 진입하고 옆의 휠로 값을 조절합니다.',
+  ab:'A320 V/S 노브는 PULL로 진입합니다. 787은 버튼으로 진입하고 휠로 값을 조절합니다. 패널 표시대로 휠을 UP 쪽(아래)으로 끌면 상승, DOWN 쪽(위)으로 끌면 강하입니다.',
+  fm:'피치 칸에 V/S 또는 FPA가 표시되고 MCP V/S 창에 값이 나타납니다.',
+  wh:'정해진 강하율이 필요할 때, 정밀 접근에서 사용합니다.',
+  wn:'진입하면 현재 수직속도로 시작하므로 큰 값이면 바로 확인하세요.'},
+ {id:'alt',n:'ALT 노브 · PUSH',one:'돌려서 고도를 정하고, PUSH하면 VNAV에서 고도 제한 삭제나 상승·강하 재개(altitude intervention)가 됩니다.',
+  ab:'A320 FCU ALT 노브는 PUSH가 managed, PULL이 open입니다. 787은 PUSH 하나로 개입하고, 속도와 FMA 모드가 상황에 맞게 자동으로 정해집니다.',
+  fm:'VNAV ALT에서 새 고도를 정한 뒤 PUSH하면 VNAV SPD로 바뀌며 상승이 재개됩니다.',
+  wh:'ATC가 고도 변경을 줬을 때 "고도 설정 → PUSH"로 씁니다.',
+  wn:'고도만 바꾸고 PUSH하지 않으면 VNAV ALT에 그대로 머뭅니다. 가장 흔한 실수입니다.'},
+ {id:'altinc',n:'AUTO · 1000',one:'ALT 노브 한 칸의 단위를 정합니다. AUTO는 100 ft(높은 고도에서는 FMC 기준), 1000은 1000 ft씩입니다.',
+  ab:'A320 FCU 고도 노브 옆의 100/1000 스위치와 같습니다. 787에서는 노브 위쪽 AUTO/1000 선택으로 합니다.',
+  fm:'MCP 고도 창의 숫자가 바뀌는 단위가 달라집니다.',
+  wh:'큰 폭으로 고도를 바꿀 때 1000으로 합니다.',
+  wn:'1000으로 둔 채 놔두면 다음에 100 ft 단위로 맞출 때 헷갈립니다.'},
+ {id:'althold',n:'ALT HOLD',one:'현재 고도를 그대로 유지합니다.',
+  ab:'A320은 선택 고도를 포착하면 ALT가 자동으로 연결되지만, 787은 현재 고도에서 바로 멈추고 싶을 때 이 버튼을 씁니다.',
+  fm:'피치 칸에 ALT가 표시되고 추력은 SPD가 됩니다.',
+  wh:'ATC가 "고도 유지"를 지시했을 때 씁니다.',
+  wn:'MCP 고도 창의 값은 바뀌지 않으니, 이후 상승·강하를 재개하려면 새 고도를 설정해야 합니다.'},
+ {id:'xfr',n:'XFR 버튼',one:'창 옆에 있는 작은 둥근 버튼입니다.',
+  ab:'A320에는 대응하는 조작이 없습니다.',
+  fm:'기능이 확인되지 않아 이 트레이너에서는 현재 값을 창으로 가져오는 가정 동작으로 구현했습니다.',
+  wh:'실기 기능은 회사 787 FCOM에서 확인해 주세요.',
+  wn:'이 설명은 확정된 정보가 아닙니다.'},
+ {id:'ap',n:'A/P 버튼 · DISENGAGE 바',one:'MCP 양 끝의 A/P 버튼으로 자동조종을 연결하고, 가운데 DISENGAGE 바를 내리면 해제됩니다.',
+  ab:'A320의 AP1/AP2 버튼과 비슷하고, 사이드스틱 디스커넥트 대신 요크의 스위치와 MCP 바를 씁니다.',
+  fm:'PFD 상단 AFDS 상태가 FLT DIR에서 A/P로 바뀝니다.',
+  wh:'200 ft RA 이상에서 연결할 수 있습니다.',
+  wn:'DISENGAGE 바가 내려가 있으면 A/P가 연결되지 않습니다. 해제 경고음도 함께 나옵니다.'},
+ {id:'fd',n:'F/D 스위치',one:'플라이트 디렉터를 좌우 독립으로 켜고 끄는 토글 스위치입니다.',
+  ab:'A320 FCU의 FD 버튼과 같지만 787은 L, R이 따로 있습니다.',
+  fm:'지상에서 켜면 TO/GA가 표시되고 PFD에 FLT DIR이 나타납니다.',
+  wh:'이륙 전 점검 때 둘 다 ON으로 합니다.',
+  wn:'한쪽만 켜면 다른 쪽 PFD에는 FD 바가 나타나지 않습니다.'},
+ {id:'locapp',n:'LOC/FAC · APP',one:'LOC/FAC는 로컬라이저(또는 최종접근코스)만, APP은 로컬라이저와 글라이드슬로프를 함께 ARM합니다.',
+  ab:'A320의 LOC, APPR 버튼에 해당합니다. A320은 LOC*, G/S*가 캡처 중이고 787은 ARM(흰색)에서 캡처(녹색)로 바뀝니다.',
+  fm:'APP을 누르면 롤 칸 아래 LOC, 피치 칸 아래 G/S가 흰색으로 ARM됩니다. 캡처되면 롤 칸이 LOC, 피치 칸이 G/S(녹색)로 바뀌고, 1500 ft RA 아래에서 A/P CMD이면 PFD에 LAND 3가 표시됩니다.',
+  wh:'ILS 접근에서 요격 헤딩을 잡은 뒤 ARM합니다. 로컬라이저 코스 근처가 되기 전에 눌러 두어야 합니다.',
+  wn:'APP만 누르고 G/S 아래에서 수평으로 요격하세요. 위에서 요격하면 하강률이 커져 불안정해질 수 있습니다. 이 트레이너의 자동착륙은 단순화한 모델입니다.'},
+ {id:'ga',n:'TO/GA (복행)',one:'접근 중 추력 레버의 TO/GA 버튼을 눌러 복행을 시작합니다. 1회는 약 2000 fpm 상승률용 추력, 2회는 최대 복행 추력입니다.',
+  ab:'A320은 추력 레버를 TOGA 디텐트까지 밀어 최대 추력을 얻습니다. 787은 레버를 움직이지 않고 버튼 횟수로 추력을 정합니다. A320의 TOGA 한 번이 787의 2회와 비슷합니다.',
+  fm:'FMA: 추력 GA, 롤 TO/GA, 피치 TO/GA. 이후 LNAV와 VNAV를 직접 눌러 경로와 상승 모드를 다시 선택합니다.',
+  wh:'불안정 접근, 활주로 장애물, ATC 지시 때 사용합니다. 복행 후에는 플랩 한 단계 올리고 양의 상승률에서 기어 UP입니다.',
+  wn:'복행 고도를 MCP에 미리 설정해 두어야 합니다. 정확한 추력 값과 상승률은 회사 FCOM으로 확인하세요(이 트레이너는 단순화한 모델입니다).'},
+ {id:'flaps',n:'플랩 레버 · 마커 속도',one:'플랩 레버를 눌러 0(UP), 1, 5, 15, 20, 25, 30 눈금에 맞추면 플랩이 천천히 따라갑니다. 이륙 후에는 PFD 속도 테이프의 녹색 마커(5, 1, UP) 속도에 도달할 때마다 한 칸씩 올립니다.',
+  ab:'A320은 CONF 0/1/1+F/2/3/FULL이고 S·F 속도와 그린 닷으로 판단합니다. 787은 플랩 각도 숫자를 쓰고, 속도 테이프의 마커가 그 역할을 합니다. 이륙 플랩은 TAKEOFF REF 값과 레버가 일치해야 하고, 다르면 이륙 형상 경고(CONFIG FLAPS)가 나옵니다.',
+  fm:'EICAS 플랩 표시(자홍색은 이동 중, 녹색은 도달), PFD의 녹색 마커 속도와 빨간 제한속도 표시. VNAV 상승 속도는 플랩이 남아 있으면 UP 마커 속도로 가속합니다.',
+  wh:'이륙 전에 TAKEOFF REF 플랩에 맞추고, 가속 후 마커 속도에서 5 → 1 → UP으로 올립니다. 접근에서는 반대로 내립니다.',
+  wn:'마커보다 느린 속도에서 올리면 경고합니다. 제한속도 초과 시 레버가 움직이지 않게 단순화했습니다. 실기의 17, 18 눈금은 생략했고 속도는 교육용 가정값이므로 회사 FCOM으로 확인하세요.'},
+ {id:'gear',n:'랜딩기어 레버',one:'랜딩기어를 올리고 내리는 레버입니다. 이륙 후 양의 상승률을 확인하면 UP, 접근에서 DN으로 내립니다.',
+  ab:'A320의 기어 레버와 같은 동작이고 양의 상승률 확인 뒤 올리는 순서도 같습니다. 상태는 이 트레이너의 간이 EICAS에서 확인합니다.',
+  fm:'이동 중에는 빨간색, 내려가면 녹색 L·N·R 세 개가 표시되고, 올라가면 표시가 꺼집니다. 기어와 플랩은 항력이 되어 속도와 상승률에 영향을 줍니다.',
+  wh:'로테이트 후 양의 상승률에서 올리고, 접근에서 속도와 형상에 맞춰 내립니다.',
+  wn:'지상에서는 올릴 수 없고 270 kt를 넘으면 내려가지 않게 단순화했습니다. 실기의 기어 제한속도와 절차는 회사 FCOM으로 확인하세요.'},
+ {id:'cstr',n:'제한고도 (Altitude Constraint)',one:'LEGS의 웨이포인트 옆 고도입니다. 6000B는 "6000 ft 이하(at or below)", 3000A는 "3000 ft 이상(at or above)"으로 통과해야 합니다.',
+  ab:'A320 F-PLN의 ALT CSTR과 같은 정보입니다. A320은 managed 상승에서 자동으로 지키고, open 모드(OP CLB, V/S)에서는 지키지 않습니다. 787도 같은 원리입니다.',
+  fm:'VNAV는 제한고도를 지킵니다. 이하 제한에 걸려 수평이 되면 피치 칸이 VNAV PTH로 표시됩니다(MCP 고도와 상관없음). FLCH와 V/S는 지키지 않습니다.',
+  wh:'계속 상승해도 된다는 허가를 받으면 ALT 노브를 PUSH해서 다음 제한을 삭제하거나 FLCH를 씁니다.',
+  wn:'A320의 PUSH는 제한을 지키는 managed, 787의 PUSH는 제한을 삭제합니다. 이미 제한고도보다 높으면 CDU에 UNABLE NEXT ALTITUDE가 표시됩니다.'},
+ {id:'fma',n:'FMA 읽는 법',one:'PFD 맨 위의 3칸은 왼쪽부터 추력, 롤, 피치입니다. 활성은 녹색, ARM 상태는 아래 흰색으로 표시됩니다.',
+  ab:'A320 FMA는 5칸이고 ARM 모드를 아래 줄에 청색으로 표시합니다. 787은 3칸이고 ARM은 흰색입니다.',
+  fm:'추력: THR REF, THR, SPD, IDLE, HOLD. 롤: LNAV, HDG SEL, HDG HOLD, TRK SEL. 피치: VNAV SPD/PTH/ALT, FLCH SPD, V/S, FPA, ALT.',
+  wh:'모드를 바꾼 직후 FMA를 확인하는 습관이 가장 중요합니다. 바뀐 모드 주위에 10초 동안 녹색 박스가 표시됩니다.',
+  wn:'HOLD(추력)는 A/T가 레버에서 손을 뗀 상태입니다. A320에는 없는 표시입니다.'},
+ {id:'tod',n:'T/D · VNAV PTH 강하',one:'T/D(Top of Descent)는 FMC가 계산한 강하 시작점입니다. MCP 고도를 낮춰 두면 T/D에서 VNAV PTH로 경로를 따라 자동으로 내려가기 시작합니다.',
+  ab:'A320은 managed 강하(DES)를 시작하려면 FCU 고도를 낮추고 노브를 PUSH해야 하고, 강하 중에는 속도 모드가 아니라 경로(DES)로 비행합니다. 787은 MCP 고도만 낮춰 두면 되고 PUSH가 필요 없습니다. MCP 고도를 낮추지 않으면 T/D에서 강하하지 않고 순항 고도에 머뭅니다.',
+  fm:'FMA: 추력 IDLE → 몇 초 뒤 HOLD, 피치 VNAV PTH. 속도는 FMC가 정하고(290, 10000 ft 아래 250), 제한고도를 모두 지키는 경로로 내려갑니다. PFD 오른쪽의 자홍색 V/DEV 포인터가 경로 편차이고 CDU 강하 페이지의 V DEV와 같은 값입니다.',
+  wh:'강하 허가를 받으면 MCP 고도를 허가 고도로 설정하고, T/D 전에 FMA와 V/DEV를 확인합니다.',
+  wn:'이 트레이너의 경로 기울기(약 3°, 300 ft/NM)와 속도는 교육용 가정값입니다. 실제 경로 계산과 속도는 회사 787 FCOM/FCTM을 따르세요.'},
+ {id:'desnow',n:'DES NOW',one:'CDU 강하 페이지 오른쪽 아래의 DES NOW를 누르면 T/D에 도달하기 전에 강하를 시작합니다.',
+  ab:'A320에서 T/D 전에 먼저 내려가려면 FCU 고도를 낮추고 노브를 PUSH하거나 V/S, OPEN DES를 씁니다. 787은 DES NOW로 VNAV 안에서 먼저 내려갑니다.',
+  fm:'FMA 피치가 VNAV SPD로 바뀌고 약 1250 fpm(이 트레이너의 가정값)으로 완만하게 내려갑니다. 경로가 따라 내려와 만나면 VNAV PTH로 바뀌고 추력이 IDLE이 됩니다.',
+  wh:'ATC가 "지금 강하 가능"이라고 했을 때 씁니다.',
+  wn:'MCP 고도가 현재 고도 아래로 설정되어 있어야 동작합니다. 정확한 CDU 동작과 강하율은 회사 FCOM으로 확인하세요 (교육용 단순화).'},
+ {id:'drag',n:'DRAG REQUIRED · 스피드브레이크',one:'경로보다 높은 상태에서 경로로 돌아가려고 더 내려가면 속도가 늘어납니다. VNAV가 속도를 지키며 따라갈 수 없을 때 CDU에 DRAG REQUIRED가 뜨고, 스피드브레이크로 항력을 더해 해결합니다.',
+  ab:'A320의 ABOVE PATH/DECEL 상황과 같은 원리입니다. A320은 스피드브레이크 레버를 당기고, 787도 스피드브레이크 레버를 씁니다. 이 트레이너는 SPD BRK 버튼으로 간단히 구현했습니다.',
+  fm:'EICAS에 DRAG REQUIRED, 전개하면 SPEEDBRAKE EXTENDED. 경로에 돌아오고 속도가 안정되면 수납합니다.',
+  wh:'직행으로 경로가 짧아졌거나 늦게 강하를 시작했을 때, 그리고 10000 ft 250 kt 제한을 맞출 때 씁니다.',
+  wn:'착륙 플랩에서는 펴지 않게 단순화했습니다. 실제 제한은 회사 FCOM을 확인하세요.'},
+ {id:'trans',n:'천이고도 BARO',one:'천이고도(Transition Altitude) 아래로 내려오면 BARO를 STD에서 QNH로 바꿔 지역 기압 기준의 고도를 읽습니다.',
+  ab:'A320은 FCU의 BARO 노브를 PUSH(STD)와 PULL(QNH 선택)로 바꿉니다. 787은 EFIS BARO 노브를 PUSH하면 STD가 해제되고, 노브를 돌려 QNH를 맞춥니다.',
+  fm:'PFD 고도 테이프 아래의 STD 표시가 QNH 값으로 바뀝니다.',
+  wh:'강하 중 천이고도(한국 14000 ft로 알려져 있으나 교육용 가정, AIP로 확인) 아래에서 합니다.',
+  wn:'이 트레이너의 QNH는 1009 hPa입니다. 실제 값은 ATIS와 AIP를 따르세요.'},
+];
+let helpCur='lnav';
+const CHIPN={tod:'T/D · 경로 강하',desnow:'DES NOW',drag:'DRAG REQUIRED',trans:'천이고도 BARO',ga:'TO/GA 복행',locapp:'LOC·APP',flaps:'플랩 레버',gear:'랜딩기어',cstr:'제한고도',flch:'FLCH',at:'A/T 버튼',atarm:'A/T ARM',clbcon:'CLB/CON',iasmach:'IAS↔MACH',spdknob:'속도 노브',spdint:'속도 개입',hdg:'HDG SEL',bank:'BANK LIMIT',hdgtrk:'HDG↔TRK',hdghold:'HDG HOLD',vsfpa:'V/S·FPA',alt:'ALT PUSH',altinc:'AUTO·1000',althold:'ALT HOLD',ap:'A/P·DISC',fd:'F/D',locapp:'LOC·APP',fma:'FMA 읽기'};
+const ACT2H={sb:'drag',lnav:'lnav',vnav:'vnav',flch:'flch',at:'at',atL:'atarm',atR:'atarm',clbcon:'clbcon',iasmach:'iasmach',vsfpa:'vsfpa',vsref:'vsfpa',altHold:'althold',hdgHold:'hdghold',hdgtrk:'hdgtrk',xfrSpd:'xfr',xfrHdg:'xfr',xfrAlt:'xfr',ap:'ap',disc:'ap',fdL:'fd',fdR:'fd',loc:'locapp',app:'locapp',altinc:'altinc',altPush:'alt',bank:'bank'};
+const KN2H={spd:'spdknob',hdg:'hdg',alt:'alt',vs:'vsfpa'};
+const KP2H={spd:'spdint',hdg:'hdg',alt:'alt'};
+function buildHelp(){
+  $('#helpChips').innerHTML=GL.map(g=>`<button class="chip" data-help="${g.id}">${CHIPN[g.id]||g.n}</button>`).join('');
+  showHelp(helpCur,true);
+}
+function showHelp(id,force){
+  if(!force&&id===helpCur)return;helpCur=id;const g=GL.find(x=>x.id===id);if(!g)return;
+  document.querySelectorAll('[data-help]').forEach(b=>b.classList.toggle('on',b.dataset.help===id));
+  $('#helpBody').innerHTML=`<div class="hb"><h3>${g.n}</h3><div class="one">${g.one}</div>
+   <div class="it ab2"><b>A320에서는</b>${g.ab}</div><div class="it fm"><b>FMA·화면에서는</b>${g.fm}</div>
+   <div class="it wh"><b>언제 쓰나</b>${g.wh}</div><div class="it wn"><b>주의</b>${g.wn}</div></div>`;
+}
+
+/* ================= lessons ================= */
+const L_GROUND=[
+ {t:'IDENT 확인 → POS INIT',d:'CDU IDENT 페이지에서 기종·엔진·NAV DATA 유효기간을 확인하고 LSK 6R (POS INIT>)을 누릅니다.',
+  ab:'A320은 INIT A 한 페이지에서 FROM/TO, CO RTE, CRZ FL을 넣습니다. 787은 IDENT → POS INIT → ROUTE → PERF INIT → THRUST LIM → TAKEOFF 순서의 페이지 체인을 따라가며, 각 페이지의 6R이 다음 페이지입니다.',c:()=>C.visited.POS},
+ {t:'POS INIT → ROUTE',d:'GPS 위치를 확인하고 LSK 6R (ROUTE>)을 누릅니다.',
+  ab:'787은 GPS 위치로 자동 정렬됩니다. A320 INIT A의 IRS INIT 확인 단계에 해당합니다.',c:()=>C.visited.RTE},
+ {t:'ORIGIN RKSI 입력',d:'키패드(또는 키보드)로 RKSI를 입력해 스크래치패드에 띄운 뒤 LSK 1L을 누릅니다.',
+  ab:'A320은 FROM/TO를 RKSI/RKPC로 한 번에 넣지만 787은 ORIGIN과 DEST를 따로 넣습니다. 박스(□)는 필수 입력 칸입니다.',c:()=>C.route.o==='RKSI'},
+ {t:'DEST RKPC 입력',d:'RKPC를 입력하고 LSK 1R.',ab:'잘못 넣으면 스크래치패드에 INVALID ENTRY 또는 NOT IN DATA BASE가 뜹니다. CLR로 지웁니다.',c:()=>C.route.d==='RKPC'},
+ {t:'RUNWAY 34L 입력',d:'34L을 입력하고 LSK 2L. DEP ARR 키로 출발 페이지에서 선택해도 됩니다.',
+  ab:'A320은 F-PLN 출발 페이지에서 활주로를 고릅니다. 787은 RTE 페이지나 DEP/ARR 페이지에서 넣습니다.',c:()=>C.route.rwy==='34L'},
+ {t:'CO ROUTE PRAC01 입력',d:'PRAC01을 입력하고 LSK 3R. 교육용 가상 회사항로입니다. ND에 하늘색 점선 항로가 나타납니다.',
+  ab:'A320 INIT A의 CO RTE와 같은 개념입니다. 하늘색 점선은 아직 활성화되지 않은 항로입니다.',c:()=>C.route.co==='PRAC01'},
+ {t:'ACTIVATE → EXEC',d:'LSK 6R (ACTIVATE>)을 누르면 EXEC 키에 불이 들어옵니다. EXEC를 눌러 확정하세요. ND 항로가 자홍색으로 바뀝니다.',
+  ab:'가장 큰 습관 차이입니다. A320은 입력이 바로 반영되고 수정은 TMPY(노란색) → INSERT입니다. 787은 항로를 바꿀 때마다 MOD → EXEC로 확정합니다.',c:()=>C.route.active},
+ {t:'PERF INIT: ZFW 172.0',d:'LSK 6R (PERF INIT>)로 이동해 172.0을 입력하고 LSK 3L (ZFW). GR WT가 연료와 합산되어 계산됩니다.',
+  ab:'A320 INIT B의 ZFW/ZFWCG 입력에 해당합니다. 단위는 1000 kg입니다.',c:()=>C.perf.zfw===172},
+ {t:'CRZ ALT FL350 · COST INDEX 80',d:'350 → LSK 1R, 80 → LSK 2R.',
+  ab:'A320은 INIT A에서 CRZ FL과 COST INDEX를 넣습니다. 787은 PERF INIT에서 넣으며, 이 값이 없으면 VNAV가 동작하지 않습니다.',c:()=>C.perf.crz===35000&&C.perf.ci===80},
+ {t:'THRUST LIM 확인 → TAKEOFF',d:'LSK 6R (THRUST LIM>)에서 TO <SEL>을 확인하고, LSK 6R (TAKEOFF>)로 이동합니다.',
+  ab:'A320은 PERF TAKE OFF 페이지의 FLEX TEMP로 감소 추력을 씁니다. 787은 THRUST LIM에서 SEL 온도(가정 온도)와 TO / TO 1 / TO 2 디레이트를 고릅니다.',c:()=>C.visited.TAKEOFF},
+ {t:'TAKEOFF REF: FLAPS 5',d:'5를 입력하고 LSK 1L. 플랩이 들어가면 FMC가 V 속도를 계산해 작은 글씨로 보여줍니다.',
+  ab:'A320은 PERF TAKE OFF에 FLAPS/THS를 넣습니다. 787은 TAKEOFF REF 페이지에 넣습니다.',c:()=>C.to.fl===5},
+ {t:'V1 · VR · V2 확정',d:'스크래치패드를 비운 채 LSK 1R, 2R, 3R을 차례로 눌러 계산값을 확정합니다. PFD의 NO VSPD가 사라지고 V 속도 표시가 나타납니다.',
+  ab:'A320은 V 속도를 직접 타이핑합니다. 787은 FMC 계산값을 LSK로 눌러 확정하거나 직접 입력합니다.',c:()=>C.to.v1&&C.to.vr&&C.to.v2},
+ {t:'플랩 레버 5',d:'플랩 레버를 5에 맞추세요. TAKEOFF REF의 플랩(5)과 레버가 다르면 이륙 시 CONFIG FLAPS 경고가 나옵니다. EICAS 플랩 표시가 5로 천천히 이동하는 것을 확인하세요.',
+  ab:'A320은 PERF TAKE OFF의 CONF(1+F 등)에 레버를 맞춥니다. 787은 TAKEOFF REF에 입력한 플랩 값과 레버가 일치해야 하고, 불일치하면 이륙 형상 경고가 나옵니다.',c:()=>S.flapLever===5},
+ {t:'EFIS BARO 1009 hPa',d:'EFIS 패널의 BARO 노브를 돌려 1009로 맞춥니다. PFD 고도가 23 ft(공항 표고)를 가리키는지 확인하세요.',
+  ab:'A320 EFIS 패널의 QNH 설정과 같습니다. 787은 설정값이 PFD 고도 테이프 아래에 표시됩니다.',c:()=>Math.abs(E.baro-1009)<0.5&&!E.std},
+ {t:'ND MAP 모드 · 10 NM',d:'EFIS MODE 노브가 MAP인지 확인하고 RANGE 노브로 10 NM을 맞춥니다.',
+  ab:'A320 ND의 ARC에 해당하는 것이 787의 MAP입니다. 787 MAP은 트랙 업(track up)으로 그려집니다.',c:()=>E.mode==='MAP'&&E.range===10&&!E.ctr},
+ {t:'F/D 스위치 L, R ON',d:'MCP 양 끝의 F/D 스위치를 올립니다. PFD에 FLT DIR과 TO/GA 모드가 표시됩니다.',
+  ab:'A320 FCU의 FD 버튼에 해당합니다. 787의 AFDS 상태 표시는 FLT DIR / A/P입니다.',c:()=>S.fdL&&S.fdR},
+ {t:'A/T ARM L, R',d:'MCP 왼쪽의 A/T ARM 스위치 두 개를 모두 ARM으로 올립니다.',
+  ab:'A320은 추력 레버를 FLX/TOGA에 넣을 때 A/THR가 무장됩니다. 787은 이륙 전에 ARM 스위치를 켜 둡니다.',c:()=>S.atL&&S.atR},
+ {t:'IAS 창에 V2 설정',d:'IAS/MACH 노브를 돌려 V2(TAKEOFF REF에서 확정한 값)를 맞춥니다.',
+  ab:'A320은 SRS가 PERF의 V2를 자동으로 씁니다. 787은 MCP IAS에 V2를 직접 넣습니다.',c:()=>C.to.v2&&S.mcp.spd===C.to.v2},
+ {t:'HDG 340 설정',d:'HDG 노브를 돌려 활주로 방향 340에 맞춥니다.',
+  ab:'A320은 이륙 시 RWY 모드로 활주로 방향을 유지하고 FCU HDG가 대시입니다. 787은 MCP HDG를 활주로 방향에 맞춰 두는 것이 일반적입니다(회사 SOP 확인).',c:()=>S.mcp.hdg===340},
+ {t:'ALT 5000 설정',d:'ALT 노브를 돌려 최초 허가 고도 5000에 맞춥니다. AUTO는 100 ft, 1000은 1000 ft 단위입니다.',
+  ab:'FCU ALT와 같습니다. 787 ALT 노브 PUSH는 VNAV 고도 제한 삭제와 상승 재개에 씁니다.',c:()=>S.mcp.alt===5000},
+ {t:'LNAV ARM',d:'LNAV 버튼을 누릅니다. FMA 롤 칸 아래에 흰색 LNAV가 나타납니다.',
+  ab:'A320은 NAV가 자동으로 ARM됩니다. 787은 직접 눌러야 하고, 항로가 EXEC되지 않았으면 ARM되지 않습니다.',c:()=>S.fma.aRoll==='LNAV'},
+ {t:'VNAV ARM',d:'VNAV 버튼을 누릅니다. FMA 피치 칸 아래에 흰색 VNAV가 나타납니다.',
+  ab:'PERF INIT이 끝나지 않았으면 CDU에 PERF/VNAV UNAVAILABLE이 뜨고 ARM되지 않습니다.',c:()=>S.fma.aPitch==='VNAV'},
+];
+const L_TAKEOFF=[
+ {t:'TO/GA 스위치',d:'추력 레버의 TO/GA 버튼을 누릅니다. FMA 추력 칸이 THR REF가 되고 A/T가 이륙 추력을 세팅합니다.',
+  ab:'레버를 TOGA/FLX 디텐트로 밀지 않습니다. 버튼을 누르면 A/T가 레버를 직접 움직입니다.',c:()=>S.flags.toga},
+ {t:'80 kt: HOLD 확인',d:'80 kt에서 추력 모드가 HOLD로 바뀝니다. 이후 A/T는 레버를 움직이지 않습니다.',
+  ab:'A320에는 대응 모드가 없습니다. HOLD 동안 조종사가 레버를 직접 조작할 수 있습니다.',c:()=>S.flags.hold},
+ {t:'VR에서 로테이트',d:'속도 테이프의 VR 표시에 도달하면 로테이트를 누르세요. FD 피치 바를 따라갑니다.',
+  ab:'요크로 하는 것만 다를 뿐 SRS 바를 따르는 것과 같습니다.',c:()=>!S.gnd},
+ {t:'양의 상승률: GEAR UP',d:'로테이트 후 고도와 상승률이 올라가는 것을 확인하고 랜딩기어 레버를 UP으로 올리세요. EICAS의 기어 표시가 빨간색(이동 중)으로 바뀌었다가 모두 올라가면 꺼집니다.',
+  ab:'A320과 같이 양의 상승률을 확인한 뒤 올립니다. 기어가 내려와 있는 동안은 항력이 커서 상승 속도 증가가 느립니다.',c:()=>S.gearLever==='UP'},
+ {t:'50 ft: LNAV 활성',d:'흰색 LNAV가 녹색으로 바뀌고 녹색 박스가 10초 동안 표시됩니다.',
+  ab:'A320은 30 ft에서 NAV가 활성화됩니다.',c:()=>S.flags.lnav},
+ {t:'400 ft: VNAV SPD',d:'피치 모드가 VNAV SPD가 됩니다. MCP IAS 창이 비워지고 FMC가 속도를 관리합니다.',
+  ab:'A320은 가속 고도까지 SRS 후 레버를 CL로 당겨 CLB가 됩니다. 787은 레버 조작 없이 VNAV가 이어받습니다.',c:()=>S.flags.vnav},
+ {t:'A/P 연결',d:'200 ft 이상에서 MCP의 A/P 스위치를 누릅니다. PFD 상태 표시가 FLT DIR에서 A/P로 바뀝니다.',
+  ab:'A320 AP1/AP2 버튼에 해당합니다. 해제는 요크 디스커넥트 또는 MCP의 DISENGAGE 바입니다.',c:()=>S.ap},
+ {t:'플랩 1: 마커 속도에서',d:'1000 ft RA를 지나면 VNAV 속도 목표가 UP 마커로 올라가 가속합니다. PFD 속도 테이프의 녹색 마커 "1"에 도달하면 플랩 레버를 5에서 1로 올리세요. 배속 ×2를 쓰면 빨리 볼 수 있습니다.',
+  ab:'A320은 F 속도에서 CONF 1, S 속도에서 CONF 0으로 올립니다. 787은 PFD의 플랩 마커(1, UP)가 그 역할을 합니다.',c:()=>S.flapLever<=1},
+ {t:'플랩 UP: UP 마커에서',d:'속도가 녹색 마커 "UP"에 도달하면 플랩 레버를 UP으로 올립니다. 이후 VNAV 속도 목표가 250으로 올라가는 것을 확인하세요.',
+  ab:'A320의 S 속도에서 CONF 0으로 올리는 동작과 같은 시점입니다.',c:()=>S.flapLever===0},
+ {t:'ALPHA 통과 확인',d:'ND 오른쪽 위의 다음 웨이포인트가 ALPHA에서 BRAVO로 바뀌고, LNAV가 항로를 따라 선회하는지 보세요.',
+  ab:'A320 ND 오른쪽 위 표시와 같은 위치입니다. 787 ND에서 활성 웨이포인트는 자홍색입니다.',c:()=>C.route.idx>=1},
+ {t:'5000 ft: VNAV ALT',d:'MCP 고도에서 레벨오프하며 VNAV ALT가 표시됩니다. FMC 순항고도보다 낮은 MCP 고도에서 멈춘 상태입니다.',
+  ab:'A320의 ALT CST*/ALT*와 비슷하지만 787은 VNAV가 유지된 채 VNAV ALT가 됩니다.',c:()=>S.flags.vnavAlt},
+ {t:'ATC: FL150으로 상승',d:'MCP ALT를 15000으로 올린 뒤 ALT 노브를 탭(PUSH)해서 VNAV 상승을 재개하세요. 6000 ft 부근에서 VNAV PTH로 멈춘다면 BRAVO의 6000B 제한고도 때문이며, 다음 단계의 DELTA 직행으로 해소됩니다.',
+  ab:'A320은 FCU ALT를 올리고 PUSH(managed CLB)합니다. 787도 PUSH가 필요하며, 하지 않으면 VNAV ALT에 그대로 머뭅니다.',c:()=>S.flags.reclimb},
+ {t:'ATC: DELTA 직행',d:'LEGS 키 → DELTA 입력 → LSK 1L → ND의 흰 점선(수정 항로) 확인 → EXEC.',
+  ab:'A320은 DIR 키 → 웨이포인트 선택 → INSERT입니다. 787은 LEGS 1L에 넣고 EXEC로 확정합니다. 웨이포인트 줄의 LSK를 누르면 그 이름이 스크래치패드로 복사됩니다.',c:()=>S.flags.dirto},
+ {t:'ATC: 230 kt 유지',d:'IAS/MACH 노브를 탭(PUSH)해 속도 창을 연 뒤 230으로 맞춥니다. VNAV는 유지됩니다.',
+  ab:'A320은 SPD 노브 PULL(selected speed)입니다. 787은 VNAV를 유지한 채 노브 PUSH로 속도에 개입(speed intervention)하고, 다시 PUSH하면 FMC 속도로 돌아갑니다.',c:()=>S.spdInt&&S.mcp.spd===230},
+];
+
+const L_EXPLAIN=[
+ {t:'ALT를 15000으로 설정',d:'ALT 노브를 돌려 15000을 맞추세요. FMA는 LNAV / VNAV ALT 상태입니다. 고도를 올렸는데 비행기가 그대로 수평으로 가는 점에 주목하세요.',
+  ab:'A320은 FCU 고도를 올리면 managed 모드에서 바로 올라가지만, 787은 VNAV ALT에서는 새 고도를 정해도 상승하지 않습니다. 다음 단계가 핵심입니다.',c:()=>S.mcp.alt===15000},
+ {t:'ALT 노브 PUSH',d:'이제 ALT 노브를 탭(PUSH)해 보세요. 피치 모드가 VNAV SPD로 바뀌면서 상승이 시작됩니다. 추력 칸은 THR REF입니다.',
+  ab:'A320의 ALT 노브 PUSH(managed CLB)와 같은 동작입니다. 이 PUSH를 잊는 것이 가장 흔한 실수입니다.',c:()=>S.flags.reclimb},
+ {t:'FLCH 누르기',d:'FLCH 버튼을 누릅니다. 추력이 THR(상승 추력)로 고정되고 피치가 MCP 속도를 유지합니다. 피치 칸이 FLCH SPD가 되었는지 확인하세요.',
+  ab:'A320의 OP CLB와 같은 개념입니다. FLCH는 MCP 속도 창의 값을 속도 목표로 씁니다. 상승률이 VNAV SPD와 어떻게 다른지 PFD 수직속도로 비교해 보세요.',c:()=>S.fma.pitch==='FLCH SPD'},
+ {t:'IAS를 220으로 돌리기',d:'IAS/MACH 노브를 돌려 220에 맞춥니다. FLCH 중에는 창이 열려 있어 바로 속도가 바뀝니다. PFD 자홍색 속도 표시와 상승률의 변화를 보세요.',
+  ab:'A320 OP CLB에서 SPD 노브를 돌리는 것과 같습니다. 속도를 줄이면 피치가 올라가 상승률이 커집니다.',c:()=>S.mcp.spd===220&&S.fma.pitch==='FLCH SPD'},
+ {t:'VNAV로 복귀',d:'VNAV 버튼을 누릅니다. 피치 모드가 VNAV SPD로 돌아오고 IAS 창이 비어 FMC 속도(고도에 따라 250 또는 310)로 바뀝니다.',
+  ab:'A320에서 ALT 노브 PUSH로 managed 상승으로 돌아오는 것과 비슷합니다. 787은 VNAV 버튼 하나로 돌아옵니다.',c:()=>isVnav()},
+ {t:'IAS 노브 PUSH (속도 개입)',d:'IAS/MACH 노브를 탭하세요. 창에 속도가 나타나고 VNAV가 유지된 채로 속도만 내가 정하게 됩니다. 한 번 더 PUSH하면 FMC 속도로 돌아갑니다.',
+  ab:'A320에서 SPD를 PULL해 selected 속도로 바꾸면서 수직은 managed를 유지하는 것과 비슷합니다. 787은 PUSH로 열고 PUSH로 닫습니다.',c:()=>S.spdInt},
+ {t:'HDG 노브 PUSH (HDG SEL)',d:'HDG 노브를 탭하세요. 롤 모드가 LNAV에서 HDG SEL로 바뀌고 ND에 자홍색 점선이 나타납니다. 노브를 돌려 방위를 바꿔 보세요.',
+  ab:'A320에서는 HDG 노브 PULL이 selected입니다. 787은 PUSH입니다. 방향이 반대라서 손이 먼저 움직이지 않도록 주의하세요.',c:()=>S.fma.roll==='HDG SEL'},
+ {t:'BANK LIMIT 15로 선택',d:'HDG 노브 바깥 링의 15 표시(점)를 탭하세요. HDG SEL 선회가 최대 15도 뱅크로 제한됩니다.',
+  ab:'A320에는 없는 787 고유 기능입니다. 기본은 AUTO입니다.',c:()=>S.bank==='15'},
+ {t:'LNAV로 복귀',d:'LNAV 버튼을 눌러 항로로 돌아가세요. 롤 모드가 LNAV로 바뀌고 비행기가 FMC 항로로 복귀합니다.',
+  ab:'A320에서 HDG 노브 PUSH로 managed NAV로 돌아가는 것과 같은 상황입니다. 787은 LNAV 버튼을 직접 누릅니다.',c:()=>S.fma.roll==='LNAV'},
+ {t:'VS/FPA 버튼과 휠',d:'VS/FPA 버튼을 눌러 피치 모드를 V/S로 바꾸세요. 이어서 옆의 휠을 위아래로 끌어 값을 바꿔 봅니다. MCP V/S 창과 PFD 수직속도가 같이 움직입니다.',
+  ab:'A320 V/S 노브 PULL과 같은 역할이지만 787은 버튼으로 진입하고 휠로 값을 조절합니다.',c:()=>S.fma.pitch==='V/S'},
+ {t:'HDG ↔ TRK 토글',d:'HDG 창 위의 작은 둥근 토글을 눌러 TRK로 바꾸세요. PFD 방위 표시 아래의 HDG가 TRK로 바뀝니다.',
+  ab:'A320의 HDG-V/S ↔ TRK-FPA 버튼은 한 번에 두 쌍을 바꿉니다. 787은 이 토글과 V/S ↔ FPA 토글이 서로 독립입니다.',c:()=>S.trk},
+];
+
+const L_CLIMB=[
+ {t:'LEGS 페이지에서 제한고도 확인',d:'CDU의 LEGS 키를 눌러 오른쪽 열을 보세요. BRAVO의 6000B는 "6000 ft 이하", ALPHA의 3000A와 CHRLI의 7000A는 "이상", DELTA의 10000B는 "10000 ft 이하"입니다. ND에도 웨이포인트 옆에 같은 값이 표시됩니다.',
+  ab:'A320 F-PLN의 ALT CSTR과 같은 정보입니다. A320도 managed 상승 중에는 제한고도를 자동으로 지킵니다.',c:()=>C.page==='LEGS'},
+ {t:'BRAVO 6000B에서 수평 유지 관찰',d:'MCP는 15000인데 VNAV는 제한고도를 지키므로 6000 ft에서 수평이 됩니다. 피치 칸이 VNAV PTH가 되는지 확인하세요. 배속 ×4로 기다리면 빨리 볼 수 있습니다.',
+  ab:'787에서는 MCP 고도가 아니라 FMC 제한고도에서 멈추면 VNAV ALT가 아니라 VNAV PTH가 표시됩니다. A320의 ALT CST와 비슷하지만 MCP 고도창을 만지지 않아도 멈춘다는 점이 중요합니다.',
+  c:()=>S.fma.pitch==='VNAV PTH'&&Math.abs(S.alt-6000)<120},
+ {t:'ALT 노브 PUSH로 제한 삭제',d:'ATC가 "제한 없이 FL150까지 계속 상승"을 허가했습니다. ALT 노브를 탭(PUSH)하면 BRAVO 6000B 제한이 삭제되고 VNAV SPD로 상승을 재개합니다. LEGS에서 BRAVO 옆 고도가 지워진 것도 확인하세요.',
+  ab:'같은 PUSH인데 의미가 다릅니다. A320 FCU ALT PUSH는 managed로 제한을 지키고, PULL(open)이 제한을 무시합니다. 787의 ALT PUSH는 다음 제한고도를 삭제합니다.',
+  c:()=>C.del.BRAVO&&S.fma.pitch==='VNAV SPD'},
+ {t:'ATC: 좌선회 헤딩 270',d:'HDG 노브를 돌려 270으로 맞추고 HDG 노브를 탭(PUSH)하세요. 롤 칸이 LNAV에서 HDG SEL로 바뀌고 ND에 자홍색 점선이 나타납니다. 수직 모드(VNAV SPD)는 그대로입니다. 필요하면 BANK LIMIT도 조절하세요.',
+  ab:'A320에서 HDG 노브를 PULL해 selected heading으로 바꾸는 것과 같은 상황입니다. 787은 PUSH이고 수직 managed 모드는 그대로 유지됩니다.',
+  c:()=>S.mcp.hdg===270&&S.fma.roll==='HDG SEL'},
+ {t:'선회 완료와 항로 이탈 확인',d:'기수가 270 근처가 될 때까지 기다리세요. ND에서 비행기가 자홍색 항로에서 멀어지는 것을 확인합니다. HDG SEL 중에는 LNAV가 꺼져 있어 웨이포인트가 순서대로 넘어가지 않고 FMC 항로는 그대로 남습니다.',
+  ab:'항로는 사라지지 않고 ND에 계속 그려집니다. 다시 LNAV를 누르면 항로로 복귀하려고 합니다.',
+  c:()=>S.fma.roll==='HDG SEL'&&Math.abs(w180(S.hdg-270))<8},
+ {t:'ATC: DELTA 직행',d:'LEGS 키 → DELTA 입력 → LSK 1L → ND의 흰 점선(수정 항로) 확인 → EXEC. EXEC 후에도 롤 칸은 HDG SEL 그대로입니다. 항로는 바뀌었지만 아직 따라가지 않습니다.',
+  ab:'A320은 DIR TO → INSERT, 787은 LEGS에서 입력 → EXEC입니다. 어느 쪽이든 HDG 상태에서는 롤 모드를 다시 LNAV(NAV)로 바꿔야 항로를 따릅니다.',c:()=>S.flags.dirto},
+ {t:'LNAV로 복귀',d:'LNAV 버튼을 눌러 DELTA로 직행하세요. 롤 칸이 LNAV로 바뀌고 ND 항로가 비행기에서 DELTA로 이어지는 선이 됩니다. 건너뛴 BRAVO와 CHRLI의 제한고도는 더 이상 적용되지 않습니다.',
+  ab:'A320에서 HDG 노브 PUSH로 managed NAV에 돌아가는 것에 해당합니다. 787은 LNAV 버튼을 직접 누릅니다.',c:()=>S.fma.roll==='LNAV'&&C.route.idx>=3&&S.flags.dirto},
+ {t:'FLCH로 제한고도 무시',d:'이제 DELTA의 10000B 제한 때문에 VNAV는 10000 ft에서 수평(VNAV PTH)이 됩니다. ATC가 "제한 없이 계속 상승"을 지시했다고 하고 FLCH를 누르세요. FLCH는 FMC 제한고도를 무시하고 MCP 15000까지 올라갑니다.',
+  ab:'A320의 OP CLB와 같이 open 모드는 ALT CSTR을 지키지 않습니다. 속도는 MCP 창 값을 따릅니다.',c:()=>S.fma.pitch==='FLCH SPD'},
+ {t:'DELTA 통과: 제한 위반 확인',d:'계속 비행해 DELTA를 통과하세요(배속 ×4 권장). 10000 ft를 넘은 상태로 통과하면 경고가 나타납니다. 제한을 의도적으로 무시하더라도 ATC 허가가 있을 때만 써야 합니다.',
+  ab:'A320에서도 open 모드로 제한을 무시하면 같은 위험이 있습니다. 기종과 상관없이 제한 무시는 조종사 책임입니다.',c:()=>S.flags.cstrViolated==='DELTA'||C.route.idx>=4},
+];
+
+const L_APP=[
+ {t:'BARO를 QNH 1009로 (STD 해제)',d:'전이고도 아래로 내려왔습니다. EFIS BARO 노브를 탭(PUSH)해 STD를 해제하고, 노브를 돌려 QNH 1009 hPa로 맞추세요. PFD 고도 테이프 아래 표시가 STD에서 1009 HPA로 바뀝니다.',
+  ab:'A320 EFIS의 QNH/STD 설정과 같은 동작입니다. 787은 노브 PUSH가 STD 전환입니다. STD로 둔 채 접근하면 고도계가 잘못 표시됩니다.',c:()=>!E.std&&Math.abs(E.baro-1009)<0.5},
+ {t:'ALT 3000 설정 후 FLCH로 강하',d:'MCP ALT를 3000으로 맞추고 FLCH를 누르세요. 추력이 IDLE → HOLD로 바뀌고 FLCH SPD로 3000 ft까지 내려갑니다. 도달하면 피치 칸이 ALT로 바뀝니다.',
+  ab:'A320의 OP DES와 같은 개념입니다. 속도는 MCP IAS 창 값을 따릅니다.',c:()=>S.mcp.alt===3000&&(S.fma.pitch==='FLCH SPD'||S.fma.pitch==='ALT')},
+ {t:'ATC: 헤딩 310, LOC 요격',d:'ATC가 "좌선회 헤딩 310, 로컬라이저 요격, ILS RW34 접근 허가"를 줬습니다. HDG 노브를 돌려 310으로 맞추고 롤 모드가 HDG SEL인지 확인하세요. ND의 하늘색 점선이 RW34 최종 접근 코스입니다.',
+  ab:'A320에서 HDG를 selected로 두고 로컬라이저를 요격하는 것과 같은 절차입니다. 요격각은 보통 30도 이하로 합니다.',c:()=>S.mcp.hdg===310&&S.fma.roll==='HDG SEL'},
+ {t:'IAS 210으로 감속, 플랩 1',d:'IAS/MACH 노브로 210을 맞추고 속도가 줄어들면 플랩 레버를 1로 내리세요. PFD 속도 테이프에 녹색 마커가 나타나고, 속도가 제한속도를 넘으면 레버가 움직이지 않습니다.',
+  ab:'A320은 그린 닷 속도에서 CONF 1(슬랫)로 내립니다. 787은 UP 마커 속도 이하에서 플랩 1을 선택합니다.',c:()=>S.mcp.spd<=210&&S.flapLever>=1},
+ {t:'APP 버튼으로 LOC · G/S ARM',d:'MCP의 APP 버튼을 누르세요. 롤 칸 아래에 흰색 LOC, 피치 칸 아래에 흰색 G/S가 나타납니다. 아직 캡처 전이라 비행기는 HDG SEL로 계속 날아갑니다.',
+  ab:'A320의 APPR 버튼과 같은 동작입니다. 787은 ARM 모드를 흰색으로 표시하고, LOC만 쓰려면 LOC/FAC 버튼을 누릅니다.',c:()=>(S.fma.aRoll==='LOC'&&S.fma.aPitch==='G/S')||S.fma.roll==='LOC'},
+ {t:'LOC 캡처 확인',d:'로컬라이저에 가까워지면 롤 칸이 녹색 LOC로 바뀌고 비행기가 코스를 따라 선회합니다. PFD 아래쪽의 LOC 편차 마름모가 가운데로 오는 것을 확인하세요. 배속 ×4를 쓰면 빨리 볼 수 있습니다.',
+  ab:'A320의 LOC* → LOC와 같은 캡처입니다. 787은 녹색 박스가 10초 동안 표시됩니다.',c:()=>S.fma.roll==='LOC'},
+ {t:'IAS 190, 플랩 5',d:'속도를 190으로 줄이고 플랩 레버를 5로 내리세요. 아직 3000 ft 수평 비행이므로 G/S는 아래에서 위로 올라옵니다.',
+  ab:'A320은 CONF 2 근처에서 속도를 맞춥니다. 787은 마커 속도에 맞춰 플랩을 단계적으로 내립니다.',c:()=>S.flapLever>=5&&S.mcp.spd<=190},
+ {t:'G/S 캡처 확인',d:'3000 ft 수평 비행 중 글라이드슬로프가 위에서 내려오면 피치 칸이 녹색 G/S로 바뀝니다. PFD 오른쪽의 G/S 편차 마름모가 가운데로 오는 것을 확인하세요.',
+  ab:'A320의 G/S* → G/S와 같습니다. MCP 고도는 3000 그대로 둔 채 글라이드슬로프를 따라 내려갑니다.',c:()=>S.fma.pitch==='G/S'},
+ {t:'GEAR DN, 플랩 20, IAS 170',d:'G/S 캡처 후 랜딩기어 레버를 DN으로 내리고, 플랩 20, IAS 170으로 정리하세요. EICAS의 기어 표시가 빨간색에서 녹색 3개로 바뀝니다.',
+  ab:'A320은 G/S 캡처 후 "Gear down, Flaps 3" 순서입니다. 787은 플랩 15, 20 단계를 거칩니다.',c:()=>S.gearLever==='DN'&&S.flapLever>=20&&S.mcp.spd<=170},
+ {t:'플랩 30, IAS 150 (Vref+5)',d:'플랩 레버를 30으로 내리고 IAS를 150(교육용 Vref 145 + 5)에 맞추세요. 속도가 180 kt 이하여야 플랩 30이 내려갑니다.',
+  ab:'A320의 FULL/CONF 3과 같은 착륙 형상입니다. 최종 접근 속도는 Vref에 바람 보정을 더해 정합니다.',c:()=>S.flapLever===30&&S.mcp.spd<=155},
+ {t:'LAND 3 확인',d:'1500 ft RA 이하에서 PFD에 녹색 LAND 3 표시가 나타나는지 확인하세요. A/P CMD, LOC, G/S 상태에서 자동착륙이 가능하다는 표시입니다.',
+  ab:'A320의 ECAM 자동착륙 표시(LAND 표시)와 같은 역할입니다. 787은 PFD에 LAND 3 또는 NO AUTOLAND로 표시됩니다.',c:()=>S.flags.land3},
+ {t:'1000 ft 안정화 접근 확인',d:'1000 ft RA에서 안정화 접근 기준을 확인합니다. 기어 DN, 착륙 플랩, 속도 정상(Vref+5 부근)이면 접근을 계속합니다. 메시지를 확인하세요.',
+  ab:'A320도 1000 ft 안정화 접근 기준이 같습니다. 기준이 맞지 않으면 복행합니다.',c:()=>S.flags.stableChecked},
+ {t:'접지와 롤아웃',d:'플레어와 접지를 지켜보세요. 50 ft 근처에서 피치 칸이 FLARE, 접지 후 롤 칸이 ROLLOUT으로 바뀌고 A/P가 해제됩니다.',
+  ab:'A320의 FLARE → ROLLOUT과 같은 모드 순서입니다.',c:()=>S.flags.landed},
+];
+const L_GA=[
+ {t:'MCP ALT를 4000으로 (복행 고도)',d:'ILS 접근 중이지만 복행 고도를 미리 MCP에 설정합니다. ALT 노브를 돌려 4000으로 맞추세요. A/P는 G/S를 계속 따르므로 비행기는 내려갑니다.',
+  ab:'A320도 복행 고도를 미리 FCU에 설정합니다. 787은 같은 MCP ALT 창에 설정합니다.',c:()=>S.mcp.alt===4000},
+ {t:'ATC: 복행 — TO/GA 1회',d:'접근 활주로에 장애물이 있다고 ATC가 복행을 지시했습니다. 추력 레버의 TO/GA 버튼을 한 번 누르세요. FMA가 GA · TO/GA · TO/GA로 바뀌고, A/T가 약 2000 fpm 상승률용 추력을 설정합니다.',
+  ab:'A320은 추력 레버를 TOGA 디텐트까지 밀어 최대 추력을 한 번에 얻습니다. 787은 TO/GA 버튼을 1회 눌러 약 2000 fpm 상승 추력, 2회 눌러 최대 복행 추력입니다. 레버를 미는 대신 버튼 횟수로 정합니다.',c:()=>S.gaPress>=1},
+ {t:'TO/GA 한 번 더: 최대 추력',d:'상승률이 부족하다고 판단했다면 TO/GA를 한 번 더 눌러 최대 복행 추력으로 올립니다. 추력 칸은 GA 그대로이고 EICAS N1이 더 올라갑니다.',
+  ab:'A320의 TOGA 한 번이 787의 2회 누름과 같은 최대 추력입니다. 1회 누름은 A320에는 없는 중간 단계입니다.',c:()=>S.gaPress>=2},
+ {t:'플랩 20으로',d:'복행에서는 첫 단계로 플랩을 20으로 올립니다. 플랩 레버를 30에서 20으로 옮기세요. 마커 속도 아래에서 올리면 경고합니다.',
+  ab:'A320은 복행 시 플랩 한 단계(CONF 3 → CONF 2)를 올립니다. 787은 플랩 30에서 20으로 올립니다.',c:()=>S.flapLever===20},
+ {t:'양의 상승률: GEAR UP',d:'고도와 상승률이 올라가는 것을 확인하고 랜딩기어 레버를 UP으로 올리세요.',
+  ab:'A320과 같이 양의 상승률을 확인한 뒤 올립니다.',c:()=>S.gearLever==='UP'},
+ {t:'LNAV로 복행 경로',d:'LNAV 버튼을 눌러 FMC 복행 경로(RW34 → MISAP)를 따라가세요. 롤 칸이 TO/GA에서 LNAV로 바뀝니다.',
+  ab:'A320의 복행은 NAV가 자동으로 복행 경로를 따르지만, 787은 TO/GA 후에 직접 LNAV를 눌러야 합니다.',c:()=>S.fma.roll==='LNAV'},
+ {t:'VNAV로 상승',d:'400 ft RA 이상에서 VNAV를 누르세요. 피치 칸이 VNAV SPD로 바뀌고 A/T가 THR REF로 바뀝니다. 플랩이 남아 있으면 속도는 UP 마커까지 가속합니다.',
+  ab:'A320에서 복행 후 레버를 CL 디텐트로 당기는 것에 해당하는 동작을 787은 VNAV 선택으로 합니다.',c:()=>isVnav()},
+ {t:'4000 ft 레벨오프 확인',d:'MCP 고도 4000에서 VNAV ALT 또는 ALT로 수평이 되는지 확인하세요. 필요하면 플랩을 마커 속도에서 계속 올립니다.',
+  ab:'A320의 ALT*와 같은 레벨오프입니다.',c:()=>S.flags.vnavAlt||S.fma.pitch==='ALT'},
+];
+const L_DES=[
+ {t:'CDU VNAV 키로 강하 페이지 열기',d:'RKSI 33R 도착 시나리오입니다. FL280 순항 중이고 ND의 초록 T/D 원이 강하 시작점입니다. CDU의 VNAV 키를 눌러 ACT ECON DES 페이지를 열고, T/D까지 거리와 V DEV를 확인하세요.',
+  ab:'A320은 MCDU PERF 페이지가 비행 단계에 따라 CLB, CRZ, DES로 바뀝니다. 787은 VNAV 키가 같은 역할을 하며, 오른쪽 아래에 DES NOW가 있습니다.',c:()=>C.page==='VNAV'},
+ {t:'MCP 고도를 3000으로 낮추기 (T/D 전에)',d:'ALT 노브를 돌려 3000으로 맞추세요 (ALT 증감 1000 단위가 편합니다). 이 고도는 FAF33의 3000 ft와 같습니다.',
+  ab:'A320은 FCU 고도를 낮춘 뒤 노브를 PUSH해야 managed 강하가 시작됩니다. 787은 PUSH가 필요 없고, 낮춰 두기만 하면 T/D에서 VNAV PTH 강하가 시작됩니다. 낮추지 않으면 T/D에서 강하하지 않습니다.',c:()=>S.mcp.alt===3000},
+ {t:'강하 시작 (T/D 또는 DES NOW)',d:'T/D까지 기다리거나, CDU 강하 페이지의 6R DES NOW를 눌러 먼저 내려가도 됩니다. 시뮬레이션 속도 ×4를 쓰면 편합니다. 강하가 시작되면 FMA 추력이 IDLE로 바뀝니다.',
+  ab:'A320의 managed 강하는 T/D에서 DES로 바뀝니다. 787은 T/D에서 VNAV PTH로 바뀌고, T/D 전에 내려가려면 DES NOW를 씁니다.',c:()=>S.flags.descent},
+ {t:'VNAV PTH 강하 읽기',d:'피치 칸이 녹색 VNAV PTH, 추력 칸이 IDLE에서 HOLD로 바뀌었는지 확인하세요. PFD 오른쪽 자홍색 V/DEV 포인터가 가운데 근처이면 경로 위에 있는 것입니다. 약 1000 ft 내려갈 때까지 지켜보세요 (JULET 통과 전에 다음 단계를 해야 합니다).',
+  ab:'A320의 DES는 추력이 IDLE이고 경로를 따르는 점이 같습니다. 787은 추력 칸에 HOLD가 표시되고, 속도는 FMC가 정합니다(290, 10000 ft 아래 250).',c:()=>S.flags.descent&&S.fma.pitch==='VNAV PTH'&&S.alt<26800},
+ {t:'ATC: KILOO 직행',d:'ATC가 "KILOO 직행"을 줬습니다. CDU LEGS 페이지에서 KILOO 줄의 왼쪽 LSK를 눌러 이름을 스크래치패드로 가져오고(또는 직접 입력), 맨 위 줄 1L을 눌러 DIRECT TO를 만든 뒤 EXEC를 누르세요. JULET를 건너뛰어 경로가 짧아집니다.',
+  ab:'A320 F-PLN의 DIR TO와 같습니다. 두 기종 모두 경로가 짧아지면 비행기가 경로보다 높아집니다.',c:()=>S.flags.dirKiloo},
+ {t:'DRAG REQUIRED 확인',d:'경로가 짧아져 비행기가 경로보다 높아졌습니다. VNAV는 속도를 지키려고 더 가파르게 내려가지 못합니다. 속도가 목표보다 10 kt 이상 빠르면 CDU에 DRAG REQUIRED가 뜹니다. V/DEV 포인터가 아래쪽(경로 아래로 내려가야 함)으로 가는 것도 보세요.',
+  ab:'A320에서 ABOVE PATH일 때 속도를 지키며 내려가려면 스피드브레이크가 필요한 것과 같습니다. 787은 DRAG REQUIRED 메시지로 알려 줍니다.',c:()=>S.flags.dragSeen},
+ {t:'스피드브레이크 전개',d:'EICAS 옆 SPD BRK 버튼을 눌러 스피드브레이크를 펴세요. 같은 속도에서 더 가파르게 내려가 경로로 돌아옵니다.',
+  ab:'A320의 스피드브레이크 레버를 당기는 것과 같습니다. 이 트레이너는 버튼으로 간단히 구현했습니다.',c:()=>S.sbUsed},
+ {t:'경로 복귀 후 스피드브레이크 수납',d:'PFD V/DEV가 가운데 근처(400 ft 이내)로 돌아오면 SPD BRK를 다시 눌러 수납하세요.',
+  ab:'스피드브레이크를 편 채로 두면 추력 IDLE에서도 속도가 줄어 VNAV가 경로를 지키지 못하게 됩니다. A320과 같은 원칙입니다.',c:()=>S.sbUsed&&!S.sb&&S.pathDev!=null&&Math.abs(S.pathDev)<400},
+ {t:'천이고도: BARO를 QNH 1009로',d:'14000 ft 아래로 내려오면 EFIS BARO 노브를 PUSH해 STD를 해제하고, 노브를 돌려 1009 hPa로 맞추세요 (HPA 선택). 고도 표시가 QNH 기준으로 바뀝니다.',
+  ab:'A320은 BARO 노브를 PULL하고 QNH를 맞춥니다. 787은 PUSH가 STD 토글이고 돌려서 값을 맞춥니다. 천이고도 값은 교육용 가정이므로 AIP로 확인하세요.',c:()=>S.alt<14000&&!E.std&&Math.abs(E.baro-QNH)<0.6},
+ {t:'10000 ft: 250 kt 확인',d:'10000 ft 아래에서는 속도가 250 kt 이하여야 합니다. 속도가 늦게 줄면 DRAG REQUIRED가 다시 뜨니 스피드브레이크를 쓰세요. 9800 ft 아래에서 IAS 260 이하가 되면 통과입니다.',
+  ab:'A320의 SPD LIM (250/10000)과 같은 제한입니다. 787도 VNAV가 10000 ft 부근에서 250 kt로 감속하도록 계획합니다.',c:()=>S.alt<9800&&S.ias<=260},
+ {t:'LIMAA 5000 ft 이하 통과 (제한고도 준수)',d:'VNAV PTH는 LIMAA의 5000B(5000 ft 이하) 제한고도를 지키며 강하합니다. LIMAA를 통과하고 메시지를 확인하세요. 이후 FAF33의 3000 ft까지 완만하게 내려갑니다.',
+  ab:'A320의 managed 강하도 ALT CSTR을 지키지만 FLCH(OP DES)나 V/S는 지키지 않습니다. 787도 FLCH와 V/S는 이 제한고도를 무시합니다.',c:()=>S.flags.pass&&S.flags.pass.LIMAA==='ok'},
+ {t:'APP 버튼으로 LOC·G/S ARM',d:'LIMAA에서 FAF33까지가 최종 접근 코스(330)와 같습니다. MCP의 APP 버튼을 눌러 LOC와 G/S를 ARM하세요. 롤 칸 아래에 흰색 LOC, 피치 칸 아래에 흰색 G/S가 표시됩니다.',
+  ab:'A320의 APPR 버튼과 같습니다. A320은 LOC*, G/S*로 표시하고 787은 ARM(흰색)에서 캡처(녹색)로 바뀝니다.',c:()=>S.fma.aRoll==='LOC'||S.fma.roll==='LOC'},
+ {t:'LOC · G/S 캡처',d:'FAF33 근처 3000 ft에서 G/S가 캡처됩니다. 롤 칸이 LOC, 피치 칸이 G/S(녹색)로 바뀌는지 확인하세요. 이후 기어와 플랩은 접근 레슨의 순서대로 정리하면 됩니다.',
+  ab:'A320의 G/S* 캡처와 같습니다. 3000 ft에서 수평으로 아래에서 G/S를 요격하는 것이 정석입니다.',c:()=>S.flags.locCap&&S.flags.gsCap},
+];
+const LESSONS={descent:L_DES,ground:L_GROUND,takeoff:L_TAKEOFF,explain:L_EXPLAIN,climb:L_CLIMB,approach:L_APP,ga:L_GA};
+const LNAME={descent:'강하 · RKSI 33R',ground:'지상 준비',takeoff:'이륙 · 초기 상승',explain:'MCP 용어 실습',climb:'상승 · 헤딩·직행·제한고도',approach:'접근 · ILS',ga:'복행'};
+
+function startLesson(id){
+  newState();setILS(ILS34);lessonId=id;step=0;stepTimes=[];
+  if(id==='takeoff'){presetTakeoff();fb('지상 준비가 끝난 상태입니다. TO/GA로 이륙을 시작하세요.');}
+  else if(id==='approach'){presetApproach();fb('RKPC 접근 중입니다. 현재 4000 ft, HDG SEL, A/P CMD이고 항공기는 RW34 최종 접근 코스 오른쪽에 있습니다.');}
+  else if(id==='descent'){presetDescent();fb('RKPC에서 RKSI로 FL280 순항 중입니다. FMA는 SPD · LNAV · VNAV PTH, 목적지 활주로는 33R입니다. 속도 버튼 ×4를 권장합니다.');}
+  else if(id==='ga'){presetGA();fb('ILS RW34 최종 접근 중입니다. A/P CMD, LOC · G/S, 기어 DN, 플랩 30입니다.');}
+  else if(id==='climb'){presetClimb();fb('RKSI 이륙 후 상승 중입니다. MCP는 FL150, LNAV / VNAV SPD 상태입니다.');}
+  else if(id==='explain'){presetAir();fb('비행 중 상태입니다. FMA의 LNAV / VNAV ALT를 먼저 읽어 보세요.');}
+  else fb('CDU IDENT 페이지부터 시작합니다.');
+  document.querySelectorAll('[data-lesson]').forEach(b=>b.classList.toggle('on',b.dataset.lesson===id));
+  checkSteps();renderAll(true);
+}
+function presetAir(){
+  presetTakeoff();
+  Object.assign(S,{gnd:false,alt:3000,ias:250,vs:0,pitch:3,thrust:0.45,x:-0.6,y:3.2,hdg:355,holdAlt:3000,ap:true,holdHdg:355});
+  Object.assign(S.mcp,{spd:250,hdg:355,alt:3000});
+  S.flags={toga:true,hold:true,lnav:true,vnav:true,vnavAlt:true};
+  S.fma={thr:'SPD',roll:'LNAV',pitch:'VNAV ALT',aRoll:'',aPitch:''};S.chg={thr:-99,roll:-99,pitch:-99};
+  S.flapLever=0;S.flap=0;S.gearLever='UP';S.gear=0;
+  C.page='LEGS';E.range=20;C.del.BRAVO=true;
+}
+function presetClimb(){
+  presetTakeoff();
+  Object.assign(S,{gnd:false,alt:2000,ias:240,vs:2200,pitch:8,thrust:0.86,x:-0.4,y:2.2,hdg:350,ap:true,holdHdg:350});
+  Object.assign(S.mcp,{spd:250,hdg:350,alt:15000});
+  S.flags={toga:true,hold:true,lnav:true,vnav:true};
+  S.fma={thr:'THR REF',roll:'LNAV',pitch:'VNAV SPD',aRoll:'',aPitch:''};S.chg={thr:-99,roll:-99,pitch:-99};
+  S.flapLever=0;S.flap=0;S.gearLever='UP';S.gear=0;
+  C.page='VNAV';E.range=40;E.opt.DATA=true;
+}
+function presetDescent(){
+  presetTakeoff();setILS(ILS33);
+  const a=WP.INDIA,b=WP.JULET,len=dst(a,b),u={x:(b.x-a.x)/len,y:(b.y-a.y)/len},hd=brg(a,b);
+  Object.assign(S,{gnd:false,alt:28000,ias:290,vs:0,pitch:2,thrust:0.63,x:a.x+u.x*13,y:a.y+u.y*13,hdg:hd,holdAlt:28000,ap:true,holdHdg:hd,rotWarn:true,sb:false});
+  Object.assign(S.mcp,{spd:290,hdg:Math.round(hd),alt:28000});
+  S.flapLever=0;S.flap=0;S.gearLever='UP';S.gear=0;
+  S.flags={toga:true,hold:true,lnav:true,vnav:true,des:true,approach:true};
+  S.fma={thr:'SPD',roll:'LNAV',pitch:'VNAV PTH',aRoll:'',aPitch:''};S.chg={thr:-99,roll:-99,pitch:-99};
+  C.rwyPos=T33;Object.assign(C.route,{o:'RKPC',d:'RKSI',rwy:'33R',co:'',flt:'KE1202',legs:[...STAR33],idx:1,from:{x:a.x,y:a.y},active:true});
+  Object.assign(C.perf,{crz:28000});C.page='LEGS';E.std=true;E.baro=1013;E.range=160;E.opt.DATA=true;
+}
+function presetApproach(){
+  presetTakeoff();
+  const h=ILS.hdg*D2R,T=ILS.T,d=24,off=4;
+  Object.assign(S,{gnd:false,alt:4000,ias:230,vs:0,pitch:3,thrust:0.4,x:T.x-Math.sin(h)*d+Math.cos(h)*off,y:T.y-Math.cos(h)*d-Math.sin(h)*off,hdg:340,holdAlt:4000,ap:true,holdHdg:340,rotWarn:true});
+  Object.assign(S.mcp,{spd:230,hdg:340,alt:4000});
+  S.flapLever=0;S.flap=0;S.gearLever='UP';S.gear=0;
+  S.flags={toga:true,hold:true,lnav:true,vnav:true,approach:true};
+  S.fma={thr:'SPD',roll:'HDG SEL',pitch:'ALT',aRoll:'',aPitch:''};S.chg={thr:-99,roll:-99,pitch:-99};
+  C.rwyPos=T;Object.assign(C.route,{o:'RKSI',d:'RKPC',rwy:'34',legs:['DOGEE','FAFXX','RW34'],idx:0,from:{x:S.x,y:S.y},active:true});
+  C.page='LEGS';E.std=true;E.baro=1013;E.range=40;
+}
+function presetGA(){
+  presetApproach();
+  const h=ILS.hdg*D2R,T=ILS.T,d=6,alt=ELEV+50+d*6076*Math.tan(ILS.gs*D2R);
+  Object.assign(S,{x:T.x-Math.sin(h)*d,y:T.y-Math.cos(h)*d,alt,ias:150,vs:-800,pitch:0,thrust:0.3,hdg:340,holdHdg:340});
+  Object.assign(S.mcp,{spd:150,hdg:340,alt:3000});
+  S.flapLever=30;S.flap=30;S.gearLever='DN';S.gear=1;
+  S.flags={toga:true,hold:true,approach:true,locCap:true,gsCap:true,land3:true,stableChecked:true,stable:true};
+  S.fma={thr:'SPD',roll:'LOC',pitch:'G/S',aRoll:'',aPitch:''};S.chg={thr:-99,roll:-99,pitch:-99};
+  C.route.legs=['RW34','MISAP'];C.route.from={x:S.x,y:S.y};C.route.idx=0;E.std=false;E.baro=1009;E.range=10;
+}
+function continueToTakeoff(){lessonId='takeoff';step=0;stepTimes=[];
+  document.querySelectorAll('[data-lesson]').forEach(b=>b.classList.toggle('on',b.dataset.lesson==='takeoff'));
+  fb('준비 완료. TO/GA로 이륙을 시작하세요.','ok');checkSteps();}
+function presetTakeoff(){
+  Object.assign(C.route,{o:'RKSI',d:'RKPC',rwy:'34L',co:'PRAC01',flt:'KE1201',legs:[...CO.PRAC01.legs],active:true,idx:0,from:{x:0,y:0}});
+  Object.assign(C.perf,{zfw:172,crz:35000,ci:80,res:5});C.to.fl=5;Object.assign(C.to,vcalc());
+  ['POS','RTE','PERF','THRUST','TAKEOFF'].forEach(p=>C.visited[p]=true);C.page='TAKEOFF';
+  E.baro=QNH;E.range=10;
+  Object.assign(S.mcp,{spd:C.to.v2,hdg:RWYH,alt:5000});
+  S.flapLever=5;S.flap=5;S.gearLever='DN';S.gear=1;
+  S.fdL=S.fdR=S.atL=S.atR=true;setMode('roll','TO/GA');setMode('pitch','TO/GA');S.fma.aRoll='LNAV';S.fma.aPitch='VNAV';
+}
+function checkSteps(){const L=LESSONS[lessonId];
+  while(step<L.length&&L[step].c()){stepTimes[step]=S.t;step++;
+    if(step===L.length) fb(lessonId==='descent'?'강하 레슨 완료. T/D부터 LOC · G/S 캡처까지 연결했습니다. 이어서 기어와 플랩을 정리해 착륙까지 비행해 보세요.':lessonId==='approach'?'ILS 접근 레슨 완료. 접지까지 확인했습니다.':lessonId==='ga'?'복행 레슨 완료. TO/GA 1회와 2회의 차이를 확인했습니다.':lessonId==='climb'?'상승 레슨 완료. 제한고도의 준수와 무시 차이를 확인했습니다.':lessonId==='ground'?'지상 준비 완료. 이륙 레슨으로 이어가세요.':lessonId==='explain'?'MCP 용어 실습 완료. 해설 칩을 눌러 복습하세요.':'이륙·초기 상승 레슨 완료. 자유롭게 연습해 보세요.','ok');}}
+
+/* ================= AFDS / MCP actions ================= */
+function cstr(n){const w=WP[n];if(!w||!w.c)return null;const m=w.c.match(/^(\d+)([AB])$/);return m?{alt:+m[1],t:m[2]}:null;}
+function nextB(){const R=C.route;if(!R.active)return null;for(let i=R.idx;i<R.legs.length;i++){const n=R.legs[i];if(C.del[n])continue;const c=cstr(n);if(c&&c.t==='B')return {n,alt:c.alt,i};}return null;}
+function wpPass(n){const c=cstr(n);if(!c||C.del[n])return;const a=Math.round(S.alt);
+  if(c.t==='B'){if(S.alt>c.alt+150){S.flags.cstrViolated=n;fb(n+' 통과: '+c.alt+' ft 이하 제한고도를 위반했습니다 (현재 '+a+' ft). FLCH나 V/S 같은 open 모드는 FMC 제한고도를 지키지 않습니다.','warn');}else{S.flags.cstrOk=n;fb(n+' 통과: '+c.alt+' ft 이하 제한고도를 지켰습니다 ('+a+' ft).','ok');}}
+  else{if(S.alt<c.alt-150){S.flags.cstrViolated=n;fb(n+' 통과: '+c.alt+' ft 이상 제한고도에 미달했습니다 (현재 '+a+' ft).','warn');}else{S.flags.cstrOk=n;}}
+  (S.flags.pass=S.flags.pass||{})[n]=S.flags.cstrViolated===n?'bad':'ok';}
+function pathPts(){
+  const R=C.route;if(!R.active)return null;const L=R.legs,fi=L.indexOf('FAF33');if(fi<0)return null;
+  const c0=cstr('FAF33');let prev={n:'FAF33',dtg:0,alt:c0?c0.alt:3000};const pts=[prev];
+  for(let i=fi-1;i>=0;i--){const n=L[i],seg=dst(WP[n],WP[L[i+1]]);let al=prev.alt+seg*GRAD;const c=C.del[n]?null:cstr(n);
+    if(c){al=c.t==='B'?Math.min(al,c.alt):Math.max(al,c.alt);}
+    al=Math.max(al,prev.alt);prev={n,dtg:prev.dtg+seg,alt:al};pts.push(prev);}
+  return pts;
+}
+function vnavPath(){
+  const R=C.route;if(!R.active||R.idx>=R.legs.length)return null;
+  const pts=pathPts();if(!pts)return null;const nxt=R.legs[R.idx],k=pts.find(q=>q.n===nxt);if(!k)return null;
+  /* 구간에 투영한 잔여 거리: 구간 전환(선회 시작) 때 경로 거리가 튀지 않게 이전 구간도 비교 */
+  const segP=(A,B,kB)=>{const dx=B.x-A.x,dy=B.y-A.y,len=Math.hypot(dx,dy)||1,t=clamp(((S.x-A.x)*dx+(S.y-A.y)*dy)/(len*len),0,1);
+    return {off:Math.hypot(S.x-(A.x+dx*t),S.y-(A.y+dy*t)),dtg:(1-t)*len+kB};};
+  let cc=segP(R.from||{x:S.x,y:S.y},WP[nxt],k.dtg);
+  if(R.idx>=2){const pw=R.legs[R.idx-1],pe=WP[pw];if(R.from&&dst(R.from,pe)<0.05){const kp=pts.find(q=>q.n===pw);if(kp){const pc=segP(WP[R.legs[R.idx-2]],pe,kp.dtg);if(pc.off<cc.off)cc=pc;}}}
+  const dtg=cc.off<5?cc.dtg:dst(S,WP[nxt])+k.dtg;
+  const crz=C.perf.crz||28000;let alt=null,slope=GRAD;
+  for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];if(dtg>=a.dtg&&dtg<=b.dtg){const f=(dtg-a.dtg)/((b.dtg-a.dtg)||1);alt=a.alt+f*(b.alt-a.alt);slope=(b.alt-a.alt)/((b.dtg-a.dtg)||1);break;}}
+  const last=pts[pts.length-1];if(alt==null){alt=last.alt+(dtg-last.dtg)*GRAD;slope=GRAD;}
+  let td=null;
+  for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];if(b.alt>=crz&&a.alt<crz){td=a.dtg+(crz-a.alt)/((b.alt-a.alt)/(b.dtg-a.dtg));break;}}
+  if(td==null)td=pts[0].alt>=crz?0:last.dtg+(crz-last.alt)/GRAD;
+  return {dtg,alt:Math.min(alt,crz),raw:alt,slope:alt>=crz?GRAD:slope,td,crz};
+}
+function tdPoint(){const pts=pathPts(),Q=vnavPath();if(!pts||!Q)return null;
+  for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];if(Q.td>=a.dtg&&Q.td<=b.dtg){const f=(Q.td-a.dtg)/((b.dtg-a.dtg)||1),A=WP[a.n],B=WP[b.n];return {x:A.x+(B.x-A.x)*f,y:A.y+(B.y-A.y)*f};}}
+  return null;}
+function startDescent(now){
+  S.flags.descent=true;
+  if(now){S.flags.desNow=true;setMode('pitch','VNAV SPD');}else S.flags.tdPassed=true;
+  if(atArm()){if(now)setMode('thr','SPD');else{setMode('thr','IDLE');S.idleT=0;}}
+  showHelp(now?'desnow':'tod');
+  fb(now?'DES NOW: 피치 칸이 VNAV SPD로 바뀌고 약 1250 fpm으로 완만하게 내려갑니다. 앞쪽에서 VNAV 경로가 따라 내려와 만나면 VNAV PTH로 바뀝니다.':'T/D 도달: 피치 칸이 VNAV PTH, 추력이 IDLE → HOLD입니다. 경로를 따라 내려갑니다.','ok');
+}
+function desNow(){
+  const Q=vnavPath();
+  if(!Q){C.msg='NO VNAV PATH';return;}
+  if(S.flags.descent){fb('이미 강하 중입니다.');return;}
+  if(S.mcp.alt>=S.alt-300){C.msg='RESET MCP ALT';fb('MCP 고도가 현재 고도 이하로 내려가 있지 않아 DES NOW가 동작하지 않습니다. 먼저 MCP 고도를 낮추세요.','warn');return;}
+  startDescent(true);
+}
+function desLogic(){
+  const f=S.fma,Q=vnavPath(),tgt=tgtSpd();S.pathDev=Q?S.alt-Q.alt:null;
+  if(Q&&!S.flags.descent&&f.pitch==='VNAV PTH'&&Q.dtg<=Q.td+0.3){
+    if(S.mcp.alt<S.alt-300)startDescent(false);
+    else if(!S.flags.noDes){S.flags.noDes=true;C.msg='RESET MCP ALT';fb('T/D에 도달했지만 MCP 고도가 순항 고도 그대로여서 강하하지 않습니다. MCP 고도를 낮추세요.','warn');}
+  }
+  if(Q&&S.flags.desNow&&f.pitch==='VNAV SPD'&&S.alt<Q.crz-300&&Q.alt<=S.alt+40){setMode('pitch','VNAV PTH');S.flags.desNow=false;if(atArm()){setMode('thr','IDLE');S.idleT=0;}fb('VNAV 경로를 요격했습니다. 피치 칸이 VNAV PTH로 바뀌었습니다.','ok');}
+  if(S.flags.descent){
+    if(f.pitch==='VNAV PTH'){
+      const near=Math.abs(S.alt-S.mcp.alt)<Math.max(150,Math.abs(S.vs)*0.12);
+      if(near&&(!Q||S.mcp.alt>Q.alt+30)){S.holdAlt=S.mcp.alt;setMode('pitch','VNAV ALT');S.flags.vnavAlt=true;if(atArm())setMode('thr','SPD');}
+      else if(Q&&atArm()){
+        if(S.ias<tgt-8&&f.thr!=='SPD')setMode('thr','SPD');
+        else if(f.thr==='SPD'&&S.ias>=tgt&&Q.alt<S.alt-100){setMode('thr','IDLE');S.idleT=0;}
+      }
+    }else if(f.pitch==='VNAV ALT'&&Q&&S.mcp.alt<S.alt-300&&Q.alt<S.alt-50){setMode('pitch','VNAV PTH');if(atArm()){setMode('thr','IDLE');S.idleT=0;}}
+  }
+  if(S.flags.descent&&S.vs<-300&&['VNAV PTH','VNAV SPD','FLCH SPD'].includes(f.pitch)&&S.ias>tgt+10){
+    if(!S.flags.dragReq){S.flags.dragReq=true;S.flags.dragSeen=true;C.msg='DRAG REQUIRED';showHelp('drag');fb('DRAG REQUIRED: 경로보다 높고 속도가 목표보다 빠릅니다. 아래 SPD BRK 버튼으로 스피드브레이크를 펴세요.','warn');}
+  }else if(S.flags.dragReq&&S.ias<tgt+4)S.flags.dragReq=false;
+  if(S.sb&&(S.flapLever>=25||S.gnd)){S.sb=false;fb('스피드브레이크가 자동으로 수납되었습니다 (착륙 플랩 또는 지상).');}
+}
+function vnavSpd(){if(S.flags.des&&ra()>=1000){if(S.flapLever>0)return VMAN[0]+5;return S.alt<10300?250:290;}
+  if(ra()<1000)return v2()+15;if(S.flapLever>0)return VMAN[0]+5;if(S.alt<10000)return 250;return 310;}
+function ilsGeom(){const h=ILS.hdg*D2R,T=ILS.T,dx=S.x-T.x,dy=S.y-T.y,dist=-(dx*Math.sin(h)+dy*Math.cos(h)),xtk=dx*Math.cos(h)-dy*Math.sin(h);
+  const d=Math.max(dist,0.01),devL=Math.atan2(xtk,d)*R2D,gsAng=Math.atan((S.alt-ELEV-50)/(d*6076))*R2D;
+  return {dist,xtk,devL,devG:gsAng-ILS.gs,on:dist>0.3&&dist<35&&Math.abs(devL)<35};}
+function tgtSpd(){const p=S.fma.pitch;
+  if(p==='TO/GA'&&S.flags.ga)return S.gaSpd;
+  if(p.startsWith('VNAV')&&!S.spdInt)return vnavSpd();
+  if(p==='TO/GA')return v2()+15;
+  return S.machRef?iasOf(S.mcp.mach,S.alt):S.mcp.spd;}
+function climbThr(){return atArm()?'THR REF':'';}
+function enterVNAV(){
+  const d=S.mcp.alt-S.alt,crz=C.perf.crz||35000;
+  if(Math.abs(S.alt-crz)<150){S.holdAlt=crz;setMode('pitch','VNAV PTH');if(atArm())setMode('thr','SPD');}
+  else if(Math.abs(d)<150){S.holdAlt=S.mcp.alt;setMode('pitch','VNAV ALT');if(atArm())setMode('thr','SPD');S.flags.vnavAlt=true;}
+  else if(d>0){setMode('pitch','VNAV SPD');setMode('thr',climbThr());}
+  else{setMode('pitch','VNAV SPD');if(atArm()){setMode('thr','IDLE');S.idleT=0;}}
+  S.flags.vnav=true;
+  const nb=nextB();if(nb&&S.alt>nb.alt+30&&!S.gnd){C.msg='UNABLE NEXT ALTITUDE';}
+}
+function vnavReady(){return C.route.active&&C.perf.crz&&C.perf.zfw;}
+function setFlap(n){
+  if(n===S.flapLever)return;showHelp('flaps');
+  if(S.gnd&&S.flags.toga&&S.ias>40){fb('이륙 활주 중에는 플랩 레버를 바꾸지 않습니다.','warn');return;}
+  const up=n<S.flapLever,lb=n===0?'UP':n;
+  if(!up&&n>0&&S.ias>VMAX[n]){fb('플랩 '+lb+': 현재 '+Math.round(S.ias)+' kt는 제한속도 '+VMAX[n]+' kt를 넘어 레버가 움직이지 않습니다(단순화한 제한).','warn');return;}
+  if(up&&!S.gnd&&S.ias<VMAN[n]-5){S.flags.flapEarly=true;fb('플랩 '+lb+': 마커 속도 '+VMAN[n]+' kt보다 낮은 '+Math.round(S.ias)+' kt입니다. 마커에 도달한 뒤 올리세요.','warn');}
+  else fb('플랩 레버 '+lb+'. EICAS의 플랩 표시가 천천히 따라갑니다.','ok');
+  S.flapLever=n;checkSteps();renderAll();
+}
+function setGear(d){
+  if(d===S.gearLever)return;showHelp('gear');
+  if(d==='UP'&&S.gnd){fb('지상에서는 랜딩기어를 올릴 수 없습니다(지상 감지).','warn');return;}
+  if(d==='DN'&&S.ias>270){fb('기어 다운 제한속도 270 kt를 넘었습니다. 속도를 줄이세요.','warn');return;}
+  if(d==='UP'&&S.vs<=0)fb('양(+)의 상승률이 아닙니다. 기어는 양의 상승률을 확인한 뒤 올립니다.','warn');
+  else fb(d==='UP'?'기어 UP. 이동 중에는 EICAS 표시가 빨간색입니다.':'기어 DN. 세 바퀴가 모두 녹색이 될 때까지 기다리세요.','ok');
+  S.gearLever=d;checkSteps();renderAll();
+}
+function dragNow(){return S.flap*0.03+(S.gear>0?0.5:0)+(S.flags.des&&!S.gnd?Math.max(0.2,0.008*gsNow()-1.2+0.02*(S.ias-(S.alt<10300?250:290))):0)+(S.sb?1.4:0);}
+function act(a){
+  const f=S.fma;
+  if(ACT2H[a])showHelp(ACT2H[a]);
+  switch(a){
+  case 'fdL':S.fdL=!S.fdL;fdChanged();break;
+  case 'fdR':S.fdR=!S.fdR;fdChanged();break;
+  case 'atL':S.atL=!S.atL;atChanged();break;
+  case 'atR':S.atR=!S.atR;atChanged();break;
+  case 'toga':
+    if(!S.gnd){
+      if(S.flapLever===0||ra()>2500){fb('복행 TO/GA는 접근 중 플랩이 나와 있을 때 사용합니다.','warn');break;}
+      showHelp('ga');S.gaPress=Math.min(2,S.gaPress+1);S.gaSpd=Math.round(S.ias);S.flags.ga=true;f.aRoll='';f.aPitch='';
+      setMode('thr','GA');setMode('roll','TO/GA');setMode('pitch','TO/GA');
+      fb(S.gaPress===1?'TO/GA 1회: A/T가 약 2000 fpm 상승률용 추력을 설정합니다. FMA: GA · TO/GA · TO/GA.':'TO/GA 2회: 최대 복행 추력입니다.','ok');break;}
+    if(lessonId==='ground'&&step<LESSONS.ground.length){fb('먼저 지상 준비를 끝내세요: '+LESSONS.ground[step].t,'warn');break;}
+    if(S.ias>50){fb('50 kt 이후에는 TO/GA가 반응하지 않습니다.','warn');break;}
+    if(!atArm()){fb('A/T ARM 스위치가 꺼져 있어 추력이 자동으로 올라가지 않습니다.','warn');break;}
+    if(C.to.fl!=null&&S.flapLever!==C.to.fl){S.flags.cfgFlaps=true;fb('CONFIG FLAPS: 플랩 레버('+(S.flapLever||'UP')+')가 TAKEOFF REF의 플랩('+C.to.fl+')과 다릅니다. 레버를 맞추세요.','warn');break;}
+    setMode('thr','THR REF');if(fdOn()){setMode('roll','TO/GA');setMode('pitch','TO/GA');}
+    S.flags.toga=true;fb('THR REF. A/T가 이륙 추력을 세팅합니다.','ok');break;
+  case 'rotate':
+    if(!S.gnd)break;
+    if(!S.flags.toga){fb('아직 이륙 추력이 없습니다.','warn');break;}
+    if(S.ias<vr()-3){fb('VR 전입니다. 이른 로테이션은 테일 스트라이크 위험이 있습니다.','warn');break;}
+    S.rotating=true;fb('로테이트. FD 피치 바를 따라갑니다.','ok');break;
+  case 'lnav':
+    if(!C.route.active){fb('FMC 항로가 EXEC되지 않아 LNAV를 ARM할 수 없습니다.','warn');break;}
+    if(S.gnd||ra()<50){f.aRoll=f.aRoll==='LNAV'?'':'LNAV';}
+    else{f.aRoll='';setMode('roll','LNAV');S.flags.lnav=true;}
+    break;
+  case 'vnav':
+    if(!vnavReady()){C.msg='PERF/VNAV UNAVAILABLE';fb('PERF INIT이 끝나지 않아 VNAV를 쓸 수 없습니다. CDU 메시지를 확인하세요.','warn');break;}
+    if(S.gnd||ra()<400){f.aPitch=f.aPitch==='VNAV'?'':'VNAV';}
+    else{f.aPitch='';enterVNAV();}
+    break;
+  case 'flch':
+    if(S.gnd){fb('FLCH는 이륙 후 사용합니다.','warn');break;}
+    f.aPitch='';setMode('pitch','FLCH SPD');S.spdInt=false;
+    if(atArm()){if(S.mcp.alt>S.alt)setMode('thr','THR');else{setMode('thr','IDLE');S.idleT=0;}}
+    fb('FLCH SPD: 피치로 MCP 속도를 유지하며 MCP 고도로 갑니다. A320 OP CLB/OP DES에 해당합니다.','ok');break;
+  case 'vsfpa':
+    if(S.gnd){fb('V/S·FPA는 이륙 후 사용합니다.','warn');break;}
+    f.aPitch='';
+    if(S.fpaRef){S.mcp.fpa=Math.round(Math.atan(S.vs/(gsNow()*101.3))*R2D*10)/10;setMode('pitch','FPA');}
+    else{S.mcp.vs=Math.round(S.vs/100)*100;setMode('pitch','V/S');}
+    if(atArm())setMode('thr','SPD');break;
+  case 'altHold':
+    if(S.gnd){fb('ALT HOLD는 이륙 후 사용합니다.','warn');break;}
+    S.holdAlt=Math.round(S.alt);f.aPitch='';setMode('pitch','ALT');if(atArm())setMode('thr','SPD');break;
+  case 'hdgHold':
+    if(S.gnd){fb('HOLD는 이륙 후 사용합니다.','warn');break;}
+    S.holdHdg=S.hdg;f.aRoll='';setMode('roll',S.trk?'TRK HOLD':'HDG HOLD');break;
+  case 'loc':
+    if(S.gnd){fb('LOC/FAC은 비행 중 사용합니다.','warn');break;}
+    if(f.roll==='LOC'){fb('LOC가 이미 캡처되었습니다.');break;}
+    f.aRoll=f.aRoll==='LOC'?'':'LOC';f.aPitch=f.aPitch==='G/S'?'':f.aPitch;fb(f.aRoll?'LOC ARM: 롤 칸 아래 흰색 LOC. 로컬라이저에 가까워지면 캡처됩니다.':'LOC ARM 해제.');break;
+  case 'app':
+    if(S.gnd){fb('APP은 비행 중 사용합니다.','warn');break;}
+    if(f.roll==='LOC'&&f.pitch==='G/S'){fb('이미 LOC와 G/S가 캡처되었습니다.');break;}
+    if(f.aPitch==='G/S'){f.aRoll=f.roll==='LOC'?'':'';f.aPitch='';fb('APP ARM 해제.');break;}
+    if(f.roll==='LOC'){f.aPitch='G/S';}else{f.aRoll='LOC';f.aPitch='G/S';}
+    fb('APP ARM: 롤 칸 아래 LOC, 피치 칸 아래 G/S가 흰색으로 표시됩니다. 캡처되면 녹색으로 바뀝니다.','ok');break;
+  case 'clbcon':fb(S.gnd?'CLB/CON은 이륙 후 상승 추력 선택에 씁니다.':'CLB 추력 기준이 선택되었습니다.');if(!S.gnd&&atArm()&&f.thr==='THR REF')S.chg.thr=S.t;break;
+  case 'at':
+    if(!atArm()){fb('A/T ARM 스위치를 먼저 켜세요.','warn');break;}
+    if(S.gnd){fb('지상에서는 TO/GA로 A/T를 시작합니다.','warn');break;}
+    setMode('thr',['VNAV SPD','TO/GA'].includes(f.pitch)?'THR REF':f.pitch==='FLCH SPD'?'THR':'SPD');break;
+  case 'ap':
+    if(S.gnd){fb('지상에서는 A/P를 연결할 수 없습니다.','warn');break;}
+    if(ra()<200){fb('A/P는 200 ft 이상에서 연결됩니다.','warn');break;}
+    if(S.disc){fb('DISENGAGE 바가 내려가 있습니다. 바를 다시 올리세요.','warn');break;}
+    S.ap=true;fb('A/P 연결.','ok');break;
+  case 'disc':S.disc=!S.disc;if(S.disc&&S.ap){S.ap=false;fb('A/P 해제. 실제로는 경고음과 EICAS 메시지가 함께 나옵니다.','warn');}break;
+  case 'iasmach':
+    if(!S.machRef){S.mcp.mach=Math.round(machOf(S.machRef?0:S.mcp.spd,S.alt)*1000)/1000;}else{S.mcp.spd=Math.round(iasOf(S.mcp.mach,S.alt));}
+    S.machRef=!S.machRef;break;
+  case 'hdgtrk':S.trk=!S.trk;if(f.roll.endsWith('SEL'))setMode('roll',S.trk?'TRK SEL':'HDG SEL');if(f.roll.endsWith('HOLD'))setMode('roll',S.trk?'TRK HOLD':'HDG HOLD');break;
+  case 'vsref':S.fpaRef=!S.fpaRef;if(f.pitch==='V/S'||f.pitch==='FPA'){act('vsfpa');return;}break;
+  case 'xfrSpd':if(isVnav()&&!S.spdInt){fb('VNAV 속도는 FMC가 관리 중입니다. IAS 노브 PUSH로 창을 연 뒤 사용하세요.');break;}S.mcp.spd=Math.round(tgtSpd());fb('IAS XFR: 현재 목표 속도를 창으로 가져왔습니다 (트레이너 가정 동작).');break;
+  case 'xfrHdg':S.mcp.hdg=Math.round(S.hdg)%360||360;fb('HDG XFR: 현재 기수 방향을 창으로 가져왔습니다 (트레이너 가정 동작).');break;
+  case 'xfrAlt':if(S.gnd){fb('ALT XFR는 비행 중 사용합니다.');break;}S.mcp.alt=Math.round(S.alt/100)*100;fb('ALT XFR: 현재 고도를 창으로 가져왔습니다 (트레이너 가정 동작).');break;
+  case 'sb':
+    if(S.gnd){fb('지상에서는 이 트레이너의 스피드브레이크를 쓰지 않습니다.','warn');break;}
+    if(!S.sb&&S.flapLever>=25){fb('착륙 플랩에서는 스피드브레이크를 펴지 않습니다.','warn');break;}
+    S.sb=!S.sb;if(S.sb)S.sbUsed=true;
+    fb(S.sb?'스피드브레이크 전개: 항력이 늘어 같은 속도로 더 가파르게 내려갈 수 있습니다. EICAS에 SPEEDBRAKE EXTENDED가 표시됩니다.':'스피드브레이크 수납.','ok');break;
+  case 'altinc':S.altInc=S.altInc==='AUTO'?'1000':'AUTO';break;
+  case 'bank':{const b=['AUTO','5','10','15','20','25'];S.bank=b[(b.indexOf(S.bank)+1)%b.length];break;}
+  case 'efisOpt':break;
+  case 'ctr':E.ctr=!E.ctr;break;
+  case 'pause':paused=!paused;$('#pauseBtn').textContent=paused?'계속':'일시정지';break;
+  case 'reset':startLesson(lessonId);return;
+  case 'cont':continueToTakeoff();break;
+  }
+  checkSteps();renderAll();
+}
+function fdChanged(){if(S.gnd&&!S.flags.toga){if(fdOn()){setMode('roll','TO/GA');setMode('pitch','TO/GA');}else{setMode('roll','');setMode('pitch','');}}}
+function atChanged(){if(!atArm()){setMode('thr','');fb('A/T ARM 해제: 추력 모드가 꺼집니다.','warn');}}
+
+/* knob turn / push */
+function knobTurn(k,n){
+  const m=S.mcp;
+  if(KN2H[k])showHelp(KN2H[k]);
+  switch(k){
+  case 'spd':
+    if(isVnav()&&!S.spdInt){fb('VNAV 중에는 IAS 창이 닫혀 있습니다. 노브를 PUSH해 속도 개입을 여세요.');break;}
+    if(S.machRef)m.mach=clamp(Math.round((m.mach+n*0.001)*1000)/1000,0.4,0.9);else m.spd=clamp(m.spd+n,100,340);break;
+  case 'hdg':m.hdg=(((m.hdg+n)%360)+360)%360||360;break;
+  case 'alt':m.alt=clamp(m.alt+n*(S.altInc==='AUTO'?100:1000),0,43000);break;
+  case 'vs':if(S.fpaRef)m.fpa=clamp(Math.round((m.fpa+n*0.1)*10)/10,-9.9,9.9);else m.vs=clamp(m.vs+n*100,-8000,6000);break;
+  case 'baro':if(E.std){fb('BARO가 STD입니다. 노브를 PUSH해 해제하세요.');break;}E.baro=E.hpa?clamp(E.baro+n,940,1060):clamp(E.baro+n*0.3386,940,1060);break;
+  case 'mins':E.mins=clamp(E.mins+n*10,0,2500);break;
+  case 'range':{const i=clamp(RANGES.indexOf(E.range)+Math.sign(n),0,RANGES.length-1);E.range=RANGES[i];break;}
+  case 'mode':{const i=clamp(NDMODES.indexOf(E.mode)+Math.sign(n),0,3);E.mode=NDMODES[i];break;}
+  }
+  S.knob[k]=(S.knob[k]||0)+Math.sign(n)*12;
+  checkSteps();updPanels();
+}
+function knobPush(k){
+  if(KP2H[k])showHelp(KP2H[k]);
+  switch(k){
+  case 'spd':
+    if(isVnav()){S.spdInt=!S.spdInt;if(S.spdInt){S.mcp.spd=Math.round(vnavSpd());fb('속도 개입: IAS 창이 열렸습니다. VNAV는 유지됩니다.','ok');}else fb('속도 개입 해제: FMC 속도로 돌아갑니다.');}
+    else fb('IAS 노브 PUSH는 VNAV 중 속도 개입(speed intervention)에 씁니다.');break;
+  case 'hdg':
+    if(S.gnd){fb('HDG SEL은 이륙 후 사용합니다.','warn');break;}
+    if(S.fma.aRoll!=='LOC')S.fma.aRoll='';setMode('roll',S.trk?'TRK SEL':'HDG SEL');fb('HDG SEL: A320 HDG 노브 PULL에 해당합니다.','ok');break;
+  case 'alt':
+    {const nb=isVnav()?nextB():null;
+    if(S.fma.pitch==='VNAV ALT'&&Math.abs(S.mcp.alt-S.alt)>150){enterVNAV();S.flags.reclimb=true;fb('ALT 노브 PUSH: VNAV가 새 고도로 상승을 재개합니다.','ok');}
+    else if(nb){C.del[nb.n]=true;S.flags.cstrDel=nb.n;fb('ALT 노브 PUSH: '+nb.n+'의 '+nb.alt+' ft 이하 제한고도를 삭제했습니다. VNAV가 MCP 고도까지 계속 상승합니다.','ok');}
+    else fb('ALT 노브 PUSH는 VNAV 고도 제한 삭제나 상승·강하 재개에 씁니다.');}break;
+  case 'baro':E.std=!E.std;break;
+  case 'mins':E.mins=200;break;
+  case 'range':E.ctr=!E.ctr;break;
+  case 'mode':break;
+  }
+  checkSteps();renderAll();
+}
+
+/* ================= flight model ================= */
+function gsNow(){return S.ias*(1+S.alt/1000*0.018);}
+function lnavHdg(gs){
+  const R=C.route;if(!R.active||R.idx>=R.legs.length)return S.hdg;
+  const w=WP[R.legs[R.idx]],f=R.from,crs=brg(f,w);
+  const ux=Math.sin(crs*D2R),uy=Math.cos(crs*D2R),ex=S.x-f.x,ey=S.y-f.y,xtk=ex*uy-ey*ux;
+  const ahead=(w.x-S.x)*ux+(w.y-S.y)*uy;
+  let lead=0.4;const nx=R.legs[R.idx+1];
+  if(nx){const nc=brg(w,WP[nx]),dth=Math.abs(w180(nc-crs));const rad=(gs*gs)/(11.26*Math.tan(25*D2R))/6076;lead=Math.min(rad*Math.tan(dth/2*D2R),5)+0.2;}
+  if(dst(S,w)<lead||ahead<0){wpPass(R.legs[R.idx]);R.from={x:w.x,y:w.y};R.idx++;return S.hdg;}
+  return (crs-clamp(xtk*45,-45,45)+360)%360;
+}
+function tick(dt){
+  S.t+=dt;const f=S.fma;
+  S.flap+=clamp(S.flapLever-S.flap,-1*dt,1*dt);
+  S.gear+=clamp((S.gearLever==='DN'?1:0)-S.gear,-dt/8,dt/8);
+  const toThr={'TO':0.95,'TO 1':0.92,'TO 2':0.88}[C.thr.sel]||0.95;
+  let thrT=S.thrust;
+  if(f.thr==='THR REF')thrT=(S.gnd||ra()<1000)?toThr:0.86;
+  else if(f.thr==='THR')thrT=0.84;
+  else if(f.thr==='GA')thrT=S.gaPress>=2?0.95:0.86;
+  else if(f.thr==='IDLE'){thrT=0.05;S.idleT+=dt;if(S.idleT>3)setMode('thr','HOLD');}
+  else if(f.thr==='SPD')thrT=clamp((1.5+dragNow()+S.vs*0.0016+(tgtSpd()-S.ias)*0.4)/6,0.05,0.95);
+  S.thrust+=clamp(thrT-S.thrust,-(S.flags.des&&f.thr==='IDLE'?0.4:0.15)*dt,0.15*dt);
+  const gs=gsNow();
+  if(S.gnd){
+    const acc=S.thrust>0.3?S.thrust*5.6-0.6:(S.ias>0?(S.flags.landed?-2.5:-1):0);
+    S.ias=Math.max(0,S.ias+acc*dt);
+    {const rh=S.flags.landed?ILS.hdg:RWYH;S.x+=Math.sin(rh*D2R)*S.ias/3600*dt;S.y+=Math.cos(rh*D2R)*S.ias/3600*dt;}
+    if(f.thr==='THR REF'&&S.ias>=80){setMode('thr','HOLD');S.flags.hold=true;}
+    if(S.rotating){S.pitch=Math.min(S.pitch+3*dt,15);if(S.pitch>=8&&S.ias>=vr()+2){S.gnd=false;S.vs=400;}}
+    else if(S.ias>vr()+15&&!S.rotWarn){S.rotWarn=true;fb('VR을 지났습니다. 로테이트하세요.','warn');}
+    S.pitchCmd=S.flags.toga?(S.ias>=vr()?15:0):0;S.bankCmd=0;return;
+  }
+  if(ra()>=50&&f.aRoll==='LNAV'){f.aRoll='';setMode('roll','LNAV');S.flags.lnav=true;}
+  if(ra()>=400&&f.aPitch==='VNAV'){f.aPitch='';enterVNAV();}
+  if(S.cstrHold&&f.pitch==='VNAV PTH'){const nb2=nextB();if(!nb2||nb2.n!==S.cstrHold){S.cstrHold=null;
+    if(S.mcp.alt>S.alt+150){setMode('pitch','VNAV SPD');if(atArm())setMode('thr','THR REF');}else{setMode('pitch','VNAV ALT');S.flags.vnavAlt=true;}}}
+  if(S.cstrHold&&f.pitch!=='VNAV PTH')S.cstrHold=null;
+  const G=ilsGeom();
+  if(f.aRoll==='LOC'&&G.on&&Math.abs(G.devL)<=1.2&&Math.abs(w180(S.hdg-ILS.hdg))<=90){f.aRoll='';setMode('roll','LOC');S.flags.locCap=true;fb('LOC 캡처: 롤 칸이 녹색 LOC로 바뀌었습니다.','ok');}
+  if(f.aPitch==='G/S'&&f.roll==='LOC'&&G.on&&Math.abs(G.devG)<0.3){f.aPitch='';setMode('pitch','G/S');if(atArm())setMode('thr','SPD');S.flags.gsCap=true;if(S.flags.des&&!S.spdInt)S.mcp.spd=Math.round(vnavSpd());fb('G/S 캡처: 피치 칸이 녹색 G/S로 바뀌었습니다. 기어와 플랩을 정리하세요.','ok');}
+  if(f.roll==='LOC'&&f.pitch==='G/S'&&S.ap&&ra()<1500&&!S.flags.land3){S.flags.land3=true;}
+  if(S.flags.approach&&ra()<1000&&!S.flags.stableChecked&&f.pitch==='G/S'){S.flags.stableChecked=true;
+    const ok=S.gearLever==='DN'&&S.gear>0.99&&S.flapLever>=25&&Math.abs(S.ias-155)<=15;S.flags.stable=ok;
+    fb(ok?'1000 ft 안정화 접근 기준을 충족합니다(기어 DN, 착륙 플랩, 속도 정상). 접근을 계속합니다.':'1000 ft 안정화 접근 기준 미충족: 기어, 플랩, 속도 중 하나가 부족합니다. 실제로는 복행을 고려합니다.',ok?'ok':'warn');}
+  if(S.flags.des)desLogic();
+  const p=f.pitch,tgt=tgtSpd();let vsT;
+  if(['TO/GA','VNAV SPD','FLCH SPD'].includes(p)){
+    const eq=(S.thrust*6-1.5-(S.flags.des?dragNow():0))/0.0016;vsT=clamp(eq+(S.ias-tgt)*150,-4000,4500);
+    if(S.mcp.alt>S.alt&&vsT<200&&p!=='FLCH SPD')vsT=200;
+    if(p==='VNAV SPD'&&S.flags.desNow)vsT=-1250;
+  }else if(p==='V/S')vsT=S.mcp.vs;
+  else if(p==='G/S'){const altGS=ELEV+50+Math.max(G.dist,0)*6076*Math.tan(ILS.gs*D2R);vsT=clamp(-Math.tan(ILS.gs*D2R)*gs*101.3+(altGS-S.alt)*2.5,-1800,500);
+    if(ra()<=50){setMode('pitch','FLARE');}}
+  else if(p==='FLARE')vsT=-Math.max(150,Math.min(500,ra()*20));
+  else if(p==='FPA')vsT=Math.tan(S.mcp.fpa*D2R)*gs*101.3;
+  else if(p==='VNAV PTH'&&S.flags.descent){const Q=vnavPath();
+    if(Q){const ta=Math.max(Q.alt,S.mcp.alt),sl=Q.alt>S.mcp.alt?Q.slope:0;
+      vsT=-sl*gs/60+(ta-S.alt)*0.6;const ov=S.ias-(tgt+15);if(ov>0)vsT+=ov*60;vsT=clamp(vsT,-3500,300);}
+    else vsT=clamp((S.mcp.alt-S.alt)*4,-1500,1000);}
+  else if(p==='ALT'||p==='VNAV ALT'||p==='VNAV PTH')vsT=clamp((S.holdAlt-S.alt)*4,-1000,1000);
+  else vsT=S.vs;
+  if(['TO/GA','VNAV SPD','FLCH SPD','V/S','FPA'].includes(p)){
+    const crz=C.perf.crz||99999;
+    const nbc=nextB();
+    if(p==='VNAV SPD'&&S.vs>0&&nbc&&nbc.alt<S.mcp.alt&&S.alt<=nbc.alt+30&&nbc.alt-S.alt<Math.max(150,S.vs*0.12)){S.holdAlt=nbc.alt;S.cstrHold=nbc.n;setMode('pitch','VNAV PTH');if(atArm())setMode('thr','SPD');}
+    else if(p==='VNAV SPD'&&S.vs>0&&crz<S.mcp.alt&&crz-S.alt<Math.max(150,S.vs*0.12)){S.holdAlt=crz;setMode('pitch','VNAV PTH');if(atArm())setMode('thr','SPD');}
+    else{const d=S.mcp.alt-S.alt,band=Math.max(150,Math.abs(S.vs)*0.12);
+      if((S.vs>0&&d>0&&d<band)||(S.vs<0&&d<0&&-d<band)){S.holdAlt=S.mcp.alt;
+        if(p==='VNAV SPD'){setMode('pitch','VNAV ALT');S.flags.vnavAlt=true;}else setMode('pitch','ALT');
+        if(atArm())setMode('thr','SPD');}}
+  }
+  S.vs+=clamp(vsT-S.vs,-700*dt,700*dt);
+  S.alt=Math.max(ELEV,S.alt+S.vs/60*dt);
+  if(S.alt<=ELEV+1&&f.pitch==='FLARE'){S.gnd=true;S.alt=ELEV;S.vs=0;S.pitch=0;S.roll=0;S.rotating=false;S.flags.landed=true;S.ap=false;setMode('thr','IDLE');S.idleT=0;setMode('roll','ROLLOUT');setMode('pitch','');fb('접지. 롤아웃 중입니다. A/T는 IDLE입니다.','ok');return;}
+  S.ias=Math.max(90,S.ias+(S.thrust*6-1.5-dragNow()-S.vs*0.0016)*dt);
+  {const fi=Math.max(S.flapLever,Math.round(S.flap));if(fi>0&&S.ias>VMAX[fi]){if(!S.flags.ovsp){S.flags.ovsp=true;fb('플랩 제한속도 초과: 플랩 '+fi+'의 제한 '+VMAX[fi]+' kt를 넘었습니다.','warn');}}else S.flags.ovsp=false;}
+  S.pitchCmd=Math.atan(S.vs/(Math.max(S.ias,100)*101.3))*R2D+3;
+  S.pitch+=(S.pitchCmd-S.pitch)*Math.min(1,dt*1.2);
+  const r=f.roll;let th=RWYH;
+  if(r==='LNAV')th=lnavHdg(gs);else if(r==='LOC')th=G.on?ILS.hdg-clamp(G.xtk*40,-30,30):S.hdg;else if(r.endsWith('SEL'))th=S.mcp.hdg;else if(r.endsWith('HOLD'))th=S.holdHdg;
+  const lim=(r.endsWith('SEL')&&S.bank!=='AUTO')?+S.bank:25;
+  S.bankCmd=clamp(w180(th-S.hdg)*2.5,-lim,lim);
+  S.roll+=clamp(S.bankCmd-S.roll,-5*dt,5*dt);
+  S.hdg=((S.hdg+S.roll*0.12*dt)%360+360)%360;
+  S.x+=Math.sin(S.hdg*D2R)*gs/3600*dt;S.y+=Math.cos(S.hdg*D2R)*gs/3600*dt;
+}
+
+/* ================= PFD ================= */
+const F='font-family="B612 Mono,monospace"';
+function indAlt(){return S.alt+((E.std?1013.25:E.baro)-QNH)*27;}
+function pfd(){
+  const f=S.fma,cx=200,cy=185,ppd=6,o=[];
+  o.push(`<defs><clipPath id="adi"><rect x="74" y="65" width="252" height="240" rx="10"/></clipPath><clipPath id="spc"><rect x="8" y="67" width="58" height="236"/></clipPath><clipPath id="alc"><rect x="334" y="67" width="60" height="236"/></clipPath><clipPath id="hdc"><rect x="90" y="326" width="220" height="40"/></clipPath></defs><rect width="400" height="370" fill="#000"/>`);
+  o.push(`<g clip-path="url(#adi)"><g transform="rotate(${(-S.roll).toFixed(2)} ${cx} ${cy}) translate(0 ${(S.pitch*ppd).toFixed(1)})">`);
+  o.push(`<rect x="-300" y="${cy-900}" width="1000" height="900" fill="#2f7fd1"/><rect x="-300" y="${cy}" width="1000" height="900" fill="#8a5a2b"/><line x1="-300" y1="${cy}" x2="700" y2="${cy}" stroke="#fff" stroke-width="2"/>`);
+  for(let p=-30;p<=30;p+=2.5){if(!p)continue;const y=cy-p*ppd,w=p%10===0?60:(p%5===0?34:14);
+    o.push(`<line x1="${cx-w/2}" y1="${y}" x2="${cx+w/2}" y2="${y}" stroke="#fff" stroke-width="1.5"/>`);
+    if(p%10===0)o.push(`<text x="${cx-w/2-5}" y="${y+4}" fill="#fff" font-size="11" text-anchor="end" ${F}>${Math.abs(p)}</text><text x="${cx+w/2+5}" y="${y+4}" fill="#fff" font-size="11" ${F}>${Math.abs(p)}</text>`);}
+  if(E.opt.FPV&&!S.gnd){const g=Math.atan(S.vs/(gsNow()*101.3))*R2D,y=cy-g*ppd;
+    o.push(`<g stroke="var(--green)" stroke-width="2" fill="none"><circle cx="${cx}" cy="${y}" r="6"/><line x1="${cx-18}" y1="${y}" x2="${cx-6}" y2="${y}"/><line x1="${cx+6}" y1="${y}" x2="${cx+18}" y2="${y}"/><line x1="${cx}" y1="${y-6}" x2="${cx}" y2="${y-13}"/></g>`);}
+  o.push(`</g><g stroke="#fff" stroke-width="2">`);
+  [-45,-30,-20,-10,10,20,30,45].forEach(a=>{const r=96,q=(a-90)*D2R,l=Math.abs(a)%30===0?12:7;o.push(`<line x1="${cx+r*Math.cos(q)}" y1="${cy+r*Math.sin(q)}" x2="${cx+(r+l)*Math.cos(q)}" y2="${cy+(r+l)*Math.sin(q)}"/>`);});
+  o.push(`</g><polygon points="${cx},${cy-96} ${cx-7},${cy-108} ${cx+7},${cy-108}" fill="#fff"/><g transform="rotate(${(-S.roll).toFixed(2)} ${cx} ${cy})"><polygon points="${cx},${cy-94} ${cx-7},${cy-82} ${cx+7},${cy-82}" fill="none" stroke="#fff" stroke-width="2"/></g></g>`);
+  if(fdOn()&&f.pitch){const dy=clamp((S.pitch-S.pitchCmd)*ppd,-50,50),dx=clamp((S.bankCmd-S.roll)*1.6,-50,50);
+    o.push(`<line x1="${cx-70}" y1="${cy+dy}" x2="${cx+70}" y2="${cy+dy}" stroke="var(--magenta)" stroke-width="3"/><line x1="${cx+dx}" y1="${cy-70}" x2="${cx+dx}" y2="${cy+70}" stroke="var(--magenta)" stroke-width="3"/>`);}
+  o.push(`<g fill="#000" stroke="#fff" stroke-width="1.5"><path d="M${cx-78} ${cy-3} h46 v18 h-8 v-10 h-38 z"/><path d="M${cx+78} ${cy-3} h-46 v18 h8 v-10 h38 z"/><rect x="${cx-4}" y="${cy-4}" width="8" height="8"/></g>`);
+  {const G=ilsGeom();if(G.on&&S.flags.approach&&!S.gnd&&(!S.flags.des||S.fma.aRoll==='LOC'||S.fma.roll==='LOC')){
+    const lx=clamp(G.devL/2.5,-1.1,1.1)*-100,gy=clamp(G.devG/0.7,-1.1,1.1)*70;
+    o.push(`<g stroke="#fff" stroke-width="1.5" fill="none">`);[-100,-50,50,100].forEach(d=>o.push(`<circle cx="${cx+d}" cy="287" r="3"/>`));[-70,-35,35,70].forEach(d=>o.push(`<circle cx="314" cy="${cy+d}" r="3"/>`));
+    o.push(`<line x1="${cx}" y1="282" x2="${cx}" y2="292"/><line x1="309" y1="${cy}" x2="319" y2="${cy}"/></g>`);
+    o.push(`<polygon points="${cx+lx},281 ${cx+lx+8},287 ${cx+lx},293 ${cx+lx-8},287" fill="none" stroke="var(--magenta)" stroke-width="2"/><polygon points="308,${cy+gy} 314,${cy+gy-8} 320,${cy+gy} 314,${cy+gy+8}" fill="none" stroke="var(--magenta)" stroke-width="2"/>`);
+    o.push(`<text x="80" y="300" fill="#fff" font-size="9" ${F}>ILS ${ILS.name}</text>`);}}
+  if(S.flags.des&&S.pathDev!=null&&S.fma.pitch.startsWith('VNAV')&&!S.gnd&&!(S.fma.aRoll==='LOC'||S.fma.roll==='LOC')){
+    const gy=clamp(S.pathDev/400,-1.1,1.1)*70;
+    o.push(`<g stroke="#fff" stroke-width="1.5" fill="none">`);[-70,-35,35,70].forEach(d=>o.push(`<circle cx="314" cy="${cy+d}" r="3"/>`));
+    o.push(`<line x1="309" y1="${cy}" x2="319" y2="${cy}"/></g><polygon points="308,${cy+gy} 314,${cy+gy-8} 320,${cy+gy} 314,${cy+gy+8}" fill="none" stroke="var(--magenta)" stroke-width="2"/><text x="314" y="${cy-80}" fill="var(--magenta)" font-size="8" text-anchor="middle" ${F}>V/DEV</text>`);}
+  const stat=S.ap?'A/P':fdOn()?'FLT DIR':'';
+  if(S.flags.land3&&S.ap&&!S.gnd&&(f.pitch==='G/S'||f.pitch==='FLARE'))o.push(`<text x="${cx}" y="76" fill="var(--green)" font-size="12" text-anchor="middle" ${F} font-weight="700">LAND 3</text>`);
+  if(stat)o.push(`<text x="${cx}" y="62" fill="var(--green)" font-size="14" text-anchor="middle" ${F} font-weight="700">${stat}</text>`);
+  if(ra()<2500)o.push(`<text x="${cx}" y="297" fill="#fff" font-size="13" text-anchor="middle" ${F}>${Math.max(0,Math.round(ra()/10)*10)}</text>`);
+  o.push(`<text x="318" y="290" fill="var(--green)" font-size="10" text-anchor="end" ${F}>${E.minsBaro?'BARO':'RADIO'}</text><text x="318" y="301" fill="var(--green)" font-size="11" text-anchor="end" ${F}>${E.mins}</text>`);
+  // speed tape
+  const kp=4,tg=tgtSpd();
+  o.push(`<rect x="8" y="67" width="58" height="236" fill="#5a6068"/><g clip-path="url(#spc)">`);
+  for(let v=Math.floor((S.ias-40)/10)*10;v<=S.ias+40;v+=10){if(v<30)continue;const y=cy-(v-S.ias)*kp;
+    o.push(`<line x1="54" y1="${y}" x2="66" y2="${y}" stroke="#fff" stroke-width="1.5"/>`);
+    if(v%20===0)o.push(`<text x="50" y="${y+4}" fill="#fff" font-size="12" text-anchor="end" ${F}>${v}</text>`);}
+  if(S.gnd&&C.to.v1){[[C.to.v1,'V1'],[C.to.vr,'VR']].forEach(([v,l])=>{const y=cy-(v-S.ias)*kp;o.push(`<line x1="58" y1="${y}" x2="66" y2="${y}" stroke="var(--green)" stroke-width="2"/><text x="56" y="${y+4}" fill="var(--green)" font-size="10" ${F} text-anchor="end">${l}</text>`);});}
+  if(!S.gnd){const fi=Math.max(S.flapLever,Math.round(S.flap));
+    FLAPS.filter(k=>k<=fi).forEach(k=>{const v=VMAN[k],y=cy-(v-S.ias)*kp;if(y<66||y>304)return;
+      o.push(`<rect x="30" y="${y-7}" width="30" height="14" fill="#000"/><line x1="60" y1="${y}" x2="66" y2="${y}" stroke="var(--green)" stroke-width="2"/><text x="45" y="${y+4}" fill="var(--green)" font-size="10" text-anchor="middle" ${F}>${k===0?'UP':k}</text>`);});
+    if(fi>0){const y=cy-(VMAX[fi]-S.ias)*kp;if(y>66&&y<304)o.push(`<line x1="40" y1="${y}" x2="66" y2="${y}" stroke="#ff5a5a" stroke-width="3"/>`);}}
+  const sy=clamp(cy-(tg-S.ias)*kp,69,301);
+  o.push(`<path d="M66 ${sy-7} h-8 v4 l-4 3 l4 3 v4 h8 z" fill="none" stroke="var(--magenta)" stroke-width="2"/></g>`);
+  o.push(`<path d="M8 ${cy-15} h46 v8 l10 7 l-10 7 v8 h-46 z" fill="#000" stroke="#fff" stroke-width="1.5"/><text x="50" y="${cy+6}" fill="#fff" font-size="17" text-anchor="end" ${F} font-weight="700">${Math.round(S.ias)}</text>`);
+  const spdTxt=S.machRef&&!(isVnav()&&!S.spdInt)?'.'+String(Math.round(S.mcp.mach*1000)).padStart(3,'0'):Math.round(tg);
+  o.push(`<text x="37" y="61" fill="var(--magenta)" font-size="14" text-anchor="middle" ${F}>${spdTxt}</text>`);
+  if(S.gnd&&!C.to.v1)o.push(`<text x="37" y="${cy-40}" fill="var(--amber)" font-size="10" text-anchor="middle" ${F}>NO</text><text x="37" y="${cy-28}" fill="var(--amber)" font-size="10" text-anchor="middle" ${F}>VSPD</text>`);
+  // alt tape
+  const ia=indAlt(),fp=0.35;
+  o.push(`<rect x="334" y="67" width="60" height="236" fill="#5a6068"/><g clip-path="url(#alc)">`);
+  for(let a=Math.floor((ia-400)/100)*100;a<=ia+400;a+=100){const y=cy-(a-ia)*fp;
+    o.push(`<line x1="334" y1="${y}" x2="${a%500===0?346:341}" y2="${y}" stroke="#fff" stroke-width="1.5"/>`);
+    if(a%200===0)o.push(`<text x="390" y="${y+4}" fill="#fff" font-size="11" text-anchor="end" ${F}>${a}</text>`);}
+  const ay=clamp(cy-(S.mcp.alt-ia)*fp,69,301);
+  o.push(`<path d="M334 ${ay-10} h10 v20 h-10 z M344 ${ay-10} v6 l-5 4 l5 4 v6" fill="none" stroke="var(--magenta)" stroke-width="2"/></g>`);
+  o.push(`<path d="M394 ${cy-15} h-50 v8 l-10 7 l10 7 v8 h50 z" fill="#000" stroke="#fff" stroke-width="1.5"/><text x="390" y="${cy+6}" fill="#fff" font-size="15" text-anchor="end" ${F} font-weight="700">${Math.round(ia)}</text>`);
+  o.push(`<text x="364" y="61" fill="var(--magenta)" font-size="14" text-anchor="middle" ${F}>${S.mcp.alt}</text>`);
+  if(E.opt.MTRS){o.push(`<rect x="336" y="${cy-34}" width="56" height="16" fill="#000" stroke="#fff"/><text x="389" y="${cy-22}" fill="#fff" font-size="11" text-anchor="end" ${F}>${Math.round(ia*0.3048)} M</text><text x="364" y="48" fill="var(--magenta)" font-size="10" text-anchor="middle" ${F}>${Math.round(S.mcp.alt*0.3048)} M</text>`);}
+  const baroTxt=E.std?'STD':E.hpa?`${Math.round(E.baro)} HPA`:`${(E.baro*0.02953).toFixed(2)} IN`;
+  o.push(`<text x="364" y="318" fill="var(--green)" font-size="11" text-anchor="middle" ${F}>${baroTxt}</text>`);
+  if(Math.abs(S.vs)>=100)o.push(`<text x="364" y="${S.vs>0?82:298}" fill="#fff" font-size="10" text-anchor="middle" ${F}>${S.vs>0?'+':''}${Math.round(S.vs/50)*50}</text>`);
+  o.push(`<text x="37" y="318" fill="#bbb" font-size="10" text-anchor="middle" ${F}>N1 ${Math.round(S.thrust*100)}</text>`);
+  // heading
+  o.push(`<rect x="90" y="326" width="220" height="40" fill="#2a2d31" rx="4"/><g clip-path="url(#hdc)">`);
+  const hp=4;
+  for(let d=Math.floor(S.hdg/5)*5-30;d<=S.hdg+30;d+=5){const x=cx+w180(d-S.hdg)*hp,dd=((d%360)+360)%360;
+    o.push(`<line x1="${x}" y1="326" x2="${x}" y2="${dd%10===0?336:332}" stroke="#fff" stroke-width="1.5"/>`);
+    if(dd%10===0)o.push(`<text x="${x}" y="350" fill="#fff" font-size="11" text-anchor="middle" ${F}>${String(dd/10).padStart(2,'0')}</text>`);}
+  const hx=cx+clamp(w180(S.mcp.hdg-S.hdg),-27,27)*hp;
+  o.push(`<path d="M${hx-6} 326 h12 v8 h-3 l-3 -4 l-3 4 h-3 z" fill="none" stroke="var(--magenta)" stroke-width="2"/></g><polygon points="${cx},327 ${cx-5},320 ${cx+5},320" fill="#fff"/>`);
+  o.push(`<text x="${cx}" y="364" fill="#fff" font-size="10" text-anchor="middle" ${F}>${String(Math.round(S.hdg)%360||360).padStart(3,'0')} ${S.trk?'TRK':'HDG'} MAG</text>`);
+  // FMA
+  o.push(`<rect x="70" y="0" width="260" height="42" fill="#000" stroke="#444"/><line x1="157" y1="2" x2="157" y2="40" stroke="#666"/><line x1="243" y1="2" x2="243" y2="40" stroke="#666"/>`);
+  [['thr',113,''],['roll',200,f.aRoll],['pitch',287,f.aPitch]].forEach(([c,x,arm])=>{const v=f[c];
+    if(v){if(S.t-S.chg[c]<10)o.push(`<rect x="${x-41}" y="3" width="82" height="20" fill="none" stroke="var(--green)" stroke-width="1.5"/>`);
+      o.push(`<text x="${x}" y="18" fill="var(--green)" font-size="${v.length>7?11:13}" text-anchor="middle" ${F} font-weight="700">${v}</text>`);}
+    if(arm)o.push(`<text x="${x}" y="37" fill="#fff" font-size="11" text-anchor="middle" ${F}>${arm}</text>`);});
+  $('#pfd').innerHTML=o.join('');
+}
+
+/* ================= EICAS (간이) ================= */
+function eicas(){
+  const o=[`<rect width="330" height="270" fill="#000"/>`],n1=20+S.thrust*84;
+  [85,245].forEach(cx=>{const r=42,cy=76,pt=a=>[cx+r*Math.sin(a*D2R),cy-r*Math.cos(a*D2R)];const [x0,y0]=pt(-135),[x1,y1]=pt(135),[nx,ny]=pt(-135+270*clamp(n1,0,110)/110);
+    o.push(`<path d="M${x0} ${y0} A${r} ${r} 0 1 1 ${x1} ${y1}" fill="none" stroke="#fff" stroke-width="2"/><line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="#fff" stroke-width="3"/><text x="${cx}" y="${cy+24}" fill="var(--green)" font-size="17" text-anchor="middle" ${F} font-weight="700">${n1.toFixed(1)}</text>`);});
+  o.push(`<text x="165" y="72" fill="#fff" font-size="13" text-anchor="middle" ${F}>N1</text><text x="165" y="88" fill="#bbb" font-size="10" text-anchor="middle" ${F}>${S.fma.thr||'---'}</text>`);
+  const msgs=[];
+  if(S.flags.cfgFlaps&&S.gnd&&S.ias<50&&C.to.fl!=null&&S.flapLever!==C.to.fl)msgs.push(['CONFIG FLAPS','#ff5a5a']);
+  if(S.flags.ovsp)msgs.push(['FLAPS OVERSPEED','var(--amber)']);
+  if(S.flags.dragReq)msgs.push(['DRAG REQUIRED','var(--amber)']);
+  if(S.sb)msgs.push(['SPEEDBRAKE EXTENDED','var(--amber)']);
+  msgs.forEach((m,i)=>o.push(`<text x="165" y="${140+i*16}" fill="${m[1]}" font-size="12" text-anchor="middle" ${F} font-weight="700">${m[0]}</text>`));
+  const X=i=>30+45*i,idx=v=>{let i=0;while(i<FLAPS.length-2&&v>=FLAPS[i+1])i++;return i+clamp((v-FLAPS[i])/(FLAPS[i+1]-FLAPS[i]),0,1);};
+  o.push(`<text x="30" y="178" fill="#fff" font-size="11" ${F}>FLAPS</text><line x1="${X(0)}" y1="205" x2="${X(6)}" y2="205" stroke="#fff" stroke-width="2"/>`);
+  FLAPS.forEach((v,i)=>o.push(`<line x1="${X(i)}" y1="200" x2="${X(i)}" y2="210" stroke="#fff" stroke-width="2"/><text x="${X(i)}" y="226" fill="#ccc" font-size="10" text-anchor="middle" ${F}>${v===0?'UP':v}</text>`));
+  const ci=FLAPS.indexOf(S.flapLever),ax=X(idx(S.flap)),moving=Math.abs(S.flap-S.flapLever)>0.15;
+  o.push(`<polygon points="${X(ci)},197 ${X(ci)-6},186 ${X(ci)+6},186" fill="none" stroke="var(--magenta)" stroke-width="2"/><rect x="${ax-3}" y="196" width="6" height="18" fill="${moving?'var(--magenta)':'var(--green)'}"/>`);
+  o.push(`<text x="300" y="178" fill="${moving?'var(--magenta)':'var(--green)'}" font-size="14" text-anchor="end" ${F} font-weight="700">${Math.round(S.flap)===0?'UP':Math.round(S.flap)}</text>`);
+  o.push(`<text x="30" y="258" fill="#fff" font-size="11" ${F}>GEAR</text>`);
+  if(S.gear>0.01)['L','N','R'].forEach((l,i)=>{const x=120+i*45,dn=S.gear>=0.99;
+    o.push(`<rect x="${x-12}" y="244" width="24" height="20" fill="${dn?'#0a3a1c':'#4a0d0d'}" stroke="${dn?'var(--green)':'#ff5a5a'}" stroke-width="2"/><text x="${x}" y="259" fill="${dn?'var(--green)':'#ff5a5a'}" font-size="12" text-anchor="middle" ${F} font-weight="700">${l}</text>`);});
+  $('#eicas').innerHTML=o.join('');
+}
+
+/* ================= ND ================= */
+function star(x,y,col,s=6){return `<path d="M${x} ${y-s} L${x+1.8} ${y-1.8} L${x+s} ${y} L${x+1.8} ${y+1.8} L${x} ${y+s} L${x-1.8} ${y+1.8} L${x-s} ${y} L${x-1.8} ${y-1.8} Z" fill="none" stroke="${col}" stroke-width="1.6"/>`;}
+function nd(){
+  const o=[],mode=E.mode,pln=mode==='PLN',ctr=E.ctr||pln||mode==='APP'||mode==='VOR';
+  const ax=200,ay=ctr?215:340,R=ctr?150:285,sc=R/E.range,gs=gsNow();
+  const up=pln?0:S.hdg,t=up*D2R;
+  let cw={x:S.x,y:S.y};
+  const R1=C.route;
+  if(pln){const n=R1.legs[R1.idx]||R1.legs[0];cw=n?WP[n]:{x:0,y:0};}
+  const P=(w)=>{const dx=w.x-cw.x,dy=w.y-cw.y;const x=dx*Math.cos(t)-dy*Math.sin(t),y=dx*Math.sin(t)+dy*Math.cos(t);return [ax+x*sc,ay-y*sc];};
+  o.push(`<defs><clipPath id="ndc"><rect x="0" y="40" width="400" height="360"/></clipPath></defs><rect width="400" height="400" fill="#000"/><g clip-path="url(#ndc)">`);
+  if(mode==='APP'||mode==='VOR'){
+    o.push(`<text x="200" y="215" fill="#aaa" font-size="12" text-anchor="middle" ${F}>${mode} MODE</text><text x="200" y="232" fill="#777" font-size="10" text-anchor="middle" ${F}>APPROACH VERSION</text>`);
+  }else{
+    // range ring
+    const rr=R/2;
+    if(ctr)o.push(`<circle cx="${ax}" cy="${ay}" r="${rr}" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="4 6" opacity=".7"/>`);
+    else o.push(`<path d="M${ax-rr*Math.sin(62*D2R)} ${ay-rr*Math.cos(62*D2R)} A${rr} ${rr} 0 0 1 ${ax+rr*Math.sin(62*D2R)} ${ay-rr*Math.cos(62*D2R)}" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="4 6" opacity=".7"/>`);
+    o.push(`<text x="${ax-rr*Math.sin(45*D2R)-6}" y="${ay-rr*Math.cos(45*D2R)}" fill="#fff" font-size="10" text-anchor="end" ${F}>${E.range/2}</text>`);
+    // extras
+    if(E.opt.ARPT)Object.entries(APT).forEach(([n,a])=>{const [x,y]=P(a);o.push(`<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="var(--cyan)" stroke-width="1.5"/><text x="${x+8}" y="${y+12}" fill="var(--cyan)" font-size="10" ${F}>${n}</text>`);});
+    if(E.opt.STA)Object.entries(VORS).forEach(([n,a])=>{const [x,y]=P(a);o.push(`<polygon points="${x-6},${y} ${x-3},${y-5} ${x+3},${y-5} ${x+6},${y} ${x+3},${y+5} ${x-3},${y+5}" fill="none" stroke="var(--cyan)" stroke-width="1.5"/><text x="${x+8}" y="${y-6}" fill="var(--cyan)" font-size="10" ${F}>${n}</text>`);});
+    if(E.opt.WPT)Object.entries(FIX).forEach(([n,a])=>{const [x,y]=P(a);o.push(star(x,y,'var(--cyan)',5)+`<text x="${x+8}" y="${y-6}" fill="var(--cyan)" font-size="10" ${F}>${n}</text>`);});
+    // runway
+    const rp=C.rwyPos||{x:0,y:0},t0=P(rp),rh=C.rwyPos?ILS.hdg:RWYH,t1=P({x:rp.x+Math.sin(rh*D2R)*2.2,y:rp.y+Math.cos(rh*D2R)*2.2});
+    if(C.rwyPos&&S.flags.approach){const bk=P({x:rp.x+Math.sin((ILS.hdg+180)*D2R)*30,y:rp.y+Math.cos((ILS.hdg+180)*D2R)*30});o.push(`<line x1="${t0[0]}" y1="${t0[1]}" x2="${bk[0]}" y2="${bk[1]}" stroke="var(--cyan)" stroke-width="1.5" stroke-dasharray="3 6"/>`);}
+    if(C.route.rwy||C.rwyPos)o.push(`<line x1="${t0[0]}" y1="${t0[1]}" x2="${t1[0]}" y2="${t1[1]}" stroke="#fff" stroke-width="4"/><line x1="${t0[0]}" y1="${t0[1]}" x2="${t1[0]}" y2="${t1[1]}" stroke="#000" stroke-width="1.5"/>`);
+    // route
+    if(R1.legs.length){
+      const pts=R1.active?[R1.from,...R1.legs.slice(R1.idx).map(n=>WP[n])]:[{x:0,y:0},...R1.legs.map(n=>WP[n])];
+      const col=R1.active?'var(--magenta)':'var(--cyan)',dash=R1.active?'':'stroke-dasharray="7 5"';
+      const d=pts.map((p,i)=>{const [x,y]=P(p);return (i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1);}).join(' ');
+      o.push(`<path d="${d}" fill="none" stroke="${col}" stroke-width="2" ${dash}/>`);
+      if(C.mod&&C.mod.type==='dir'){const tgts=[{x:S.x,y:S.y},...R1.legs.slice(C.mod.idx).map(n=>WP[n])];
+        o.push(`<path d="${tgts.map((p,i)=>{const [x,y]=P(p);return (i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1);}).join(' ')}" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="7 5"/>`);}
+      (R1.active?R1.legs.slice(R1.idx):R1.legs).forEach((n,i)=>{const w=WP[n],[x,y]=P(w),act=R1.active&&i===0;const c=act?'var(--magenta)':'#fff';
+        o.push(star(x,y,c)+`<text x="${x+9}" y="${y-6}" fill="${c}" font-size="11" ${F}>${n}</text>`);
+        if(E.opt.DATA&&w.c&&!C.del[n])o.push(`<text x="${x+9}" y="${y+7}" fill="#fff" font-size="9" ${F}>${w.c}</text>`);});
+    }
+    if(S.flags.des&&!S.flags.descent){const q=tdPoint();if(q){const [x,y]=P(q);o.push(`<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="var(--green)" stroke-width="2"/><text x="${x+9}" y="${y+4}" fill="var(--green)" font-size="11" ${F}>T/D</text>`);}}
+    if(E.opt.TFC){const tf={x:6,y:12},[x,y]=P(tf),rel=Math.round((7000-S.alt)/100);o.push(`<polygon points="${x},${y-6} ${x+6},${y} ${x},${y+6} ${x-6},${y}" fill="none" stroke="#fff" stroke-width="1.5"/><text x="${x}" y="${y-9}" fill="#fff" font-size="9" text-anchor="middle" ${F}>${rel>0?'+':''}${String(rel).padStart(2,'0')}</text>`);}
+    // altitude range arc
+    if(!S.gnd&&!pln&&Math.abs(S.vs)>200){const dAlt=S.mcp.alt-S.alt;if(Math.sign(dAlt)===Math.sign(S.vs)){const dn=Math.abs(dAlt/S.vs)*gs/60;if(dn<E.range){const r=dn*sc;
+      o.push(`<path d="M${ax-r*Math.sin(15*D2R)} ${ay-r*Math.cos(15*D2R)} A${r} ${r} 0 0 1 ${ax+r*Math.sin(15*D2R)} ${ay-r*Math.cos(15*D2R)}" fill="none" stroke="var(--green)" stroke-width="2"/>`);}}}
+    // selected heading line
+    if(!pln&&S.fma.roll.endsWith('SEL')){const a=w180(S.mcp.hdg-up)*D2R;o.push(`<line x1="${ax}" y1="${ay}" x2="${ax+R*Math.sin(a)}" y2="${ay-R*Math.cos(a)}" stroke="var(--magenta)" stroke-width="1.5" stroke-dasharray="6 6"/>`);}
+    // aircraft
+    if(pln){const [x,y]=P({x:S.x,y:S.y}),h=S.hdg;o.push(`<g transform="translate(${x} ${y}) rotate(${h})"><path d="M0 -10 L6 8 L0 4 L-6 8 Z" fill="none" stroke="#fff" stroke-width="2"/></g>`);}
+    else o.push(`<path d="M${ax} ${ay-12} L${ax+8} ${ay+10} L${ax-8} ${ay+10} Z" fill="none" stroke="#fff" stroke-width="2"/><line x1="${ax}" y1="${ay-12}" x2="${ax}" y2="${ay-R+10}" stroke="#fff" stroke-width="1" opacity=".6"/>`);
+  }
+  // compass
+  const cr=ctr?R:R;
+  if(ctr||pln)o.push(`<circle cx="${ax}" cy="${ay}" r="${cr}" fill="none" stroke="#fff" stroke-width="1.5"/>`);
+  else o.push(`<path d="M${ax-cr*Math.sin(62*D2R)} ${ay-cr*Math.cos(62*D2R)} A${cr} ${cr} 0 0 1 ${ax+cr*Math.sin(62*D2R)} ${ay-cr*Math.cos(62*D2R)}" fill="none" stroke="#fff" stroke-width="1.5"/>`);
+  for(let d=0;d<360;d+=5){const rel=w180(d-up);if(!ctr&&!pln&&Math.abs(rel)>62)continue;const a=rel*D2R,l=d%10===0?10:5;
+    o.push(`<line x1="${ax+cr*Math.sin(a)}" y1="${ay-cr*Math.cos(a)}" x2="${ax+(cr-l)*Math.sin(a)}" y2="${ay-(cr-l)*Math.cos(a)}" stroke="#fff" stroke-width="1.3"/>`);
+    if(d%30===0){const tx=ax+(cr-20)*Math.sin(a),ty=ay-(cr-20)*Math.cos(a)+4;o.push(`<text x="${tx}" y="${ty}" fill="#fff" font-size="${d%90===0?12:10}" text-anchor="middle" ${F}>${pln&&d===0?'N':d/10}</text>`);}}
+  if(!pln){const a=w180(S.mcp.hdg-up);if(ctr||Math.abs(a)<=62){const q=a*D2R,x=ax+cr*Math.sin(q),y=ay-cr*Math.cos(q);
+    o.push(`<g transform="translate(${x} ${y}) rotate(${a})"><path d="M-7 0 v-8 h4 l3 5 l3 -5 h4 v8 z" fill="none" stroke="var(--magenta)" stroke-width="2"/></g>`);}}
+  o.push(`</g>`);
+  // header
+  o.push(`<text x="8" y="16" fill="#fff" font-size="11" ${F}>GS <tspan font-size="14">${Math.round(gs)}</tspan>  TAS <tspan font-size="14">${Math.round(gs)}</tspan></text><text x="8" y="32" fill="#fff" font-size="11" ${F}>---°/--</text>`);
+  if(!pln){o.push(`<rect x="174" y="4" width="52" height="22" fill="none" stroke="#fff"/><text x="200" y="21" fill="#fff" font-size="15" text-anchor="middle" ${F}>${String(Math.round(S.hdg)%360||360).padStart(3,'0')}</text><text x="168" y="20" fill="var(--green)" font-size="11" text-anchor="end" ${F}>${S.trk?'TRK':'TRK'}</text><text x="232" y="20" fill="var(--green)" font-size="11" ${F}>MAG</text>`);}
+  else o.push(`<text x="200" y="20" fill="#fff" font-size="12" text-anchor="middle" ${F}>PLN</text>`);
+  if(R1.active&&R1.idx<R1.legs.length){const n=R1.legs[R1.idx],w=WP[n],d=dst(S,w),eta=new Date(Date.now()+(gs>30?d/gs*3600000:0));
+    o.push(`<text x="392" y="16" fill="var(--magenta)" font-size="13" text-anchor="end" ${F}>${n}</text><text x="392" y="31" fill="#fff" font-size="11" text-anchor="end" ${F}>${String(eta.getUTCHours()).padStart(2,'0')}${String(eta.getUTCMinutes()).padStart(2,'0')}.${Math.floor(eta.getUTCSeconds()/6)}z</text><text x="392" y="45" fill="#fff" font-size="11" text-anchor="end" ${F}>${d.toFixed(1)} NM</text>`);}
+  const lab=[];if(E.opt.WXR)lab.push('<tspan fill="var(--green)">WXR</tspan>');if(E.opt.TERR)lab.push('<tspan fill="var(--amber)">TERR</tspan>');if(E.opt.TFC)lab.push('<tspan fill="var(--cyan)">TFC</tspan>');
+  if(lab.length)o.push(`<text x="8" y="392" font-size="11" ${F}>${lab.join(' ')}</text>`);
+  if(C.mod)o.push(`<text x="392" y="392" fill="#fff" font-size="11" text-anchor="end" ${F}>MOD</text>`);
+  $('#nd').innerHTML=o.join('');
+}
+
+/* ================= CDU ================= */
+const SEP='------------------------';
+function scr(){
+  const L=Array.from({length:14},()=>Array.from({length:24},()=>({ch:' ',k:''})));
+  const put=(r,c,t,k='')=>{t=String(t);for(let i=0;i<t.length;i++){const cc=c+i;if(cc>=0&&cc<24)L[r][cc]={ch:t[i],k};}};
+  return {L,put,c:(r,t,k)=>put(r,Math.floor((24-String(t).length)/2),t,k),
+    title:(t,pg)=>{put(0,Math.floor((24-t.length)/2),t);if(pg)put(0,24-pg.length,pg,'s');},
+    lab:(n,lt,rt)=>{if(lt)put(2*n-1,1,lt,'s');if(rt)put(2*n-1,23-rt.length,rt,'s');},
+    dl:(n,t,k)=>put(2*n,0,t,k),dr:(n,t,k)=>put(2*n,24-String(t).length,t,k),sep:()=>put(11,0,SEP,'s')};
+}
+const box=n=>'□'.repeat(n);
+function rteTitle(base){return (C.mod&&C.mod.type==='act'?'':C.route.active?'ACT ':C.mod?'MOD ':'')+base;}
+const PAGES={
+  IDENT(P){P.title('IDENT');P.lab(1,'MODEL','ENGINES');P.dl(1,'787-9');P.dr(1,'GEnx-1B74/75');
+    P.lab(2,'NAV DATA','ACTIVE');P.dl(2,'TRN2610001');P.dr(2,'OCT01NOV28/26');
+    P.lab(3,'DRAG/FF');P.dl(3,'+0.0/+0.0');P.lab(4,'OP PROGRAM');P.dl(4,'TRAINER V0.2');P.sep();P.dl(6,'<INDEX');P.dr(6,'POS INIT>');},
+  INDEX(P){P.title('INIT/REF INDEX');['<IDENT','<POS','<PERF','<THRUST LIM','<TAKEOFF','<APPROACH'].forEach((t,i)=>P.dl(i+1,t));P.dr(1,'NAV DATA>');},
+  POS(P){const pos='N37°27.6 E126°26.4';P.title('POS INIT','1/3');P.lab(1,'','LAST POS');P.dr(1,pos);
+    P.lab(2,'REF AIRPORT');P.dl(2,'RKSI');P.lab(3,'GATE');P.dl(3,'-----');P.lab(4,'','GPS POS');P.dr(4,pos);
+    const d=new Date();P.lab(5,'UTC (GPS)');P.dl(5,String(d.getUTCHours()).padStart(2,'0')+String(d.getUTCMinutes()).padStart(2,'0')+'z');
+    P.sep();P.dl(6,'<INDEX');P.dr(6,'ROUTE>');},
+  RTE(P){const r=C.route;
+    if(C.pg===2){P.title(rteTitle('RTE 1'),'2/2');P.lab(1,'VIA','TO');r.legs.slice(0,5).forEach((n,i)=>{P.dl(i+1,'DCT');P.dr(i+1,n);});
+      if(!r.legs.length){P.dl(1,'-----');P.dr(1,box(5));}}
+    else{P.title(rteTitle('RTE 1'),'1/2');P.lab(1,'ORIGIN','DEST');P.dl(1,r.o||box(4));P.dr(1,r.d||box(4));
+      P.lab(2,'RUNWAY','FLT NO');P.dl(2,r.rwy?'RW'+r.rwy:'-----');P.dr(2,r.flt||'----------');
+      P.lab(3,'REQUEST','CO ROUTE');P.dl(3,'<SEND');P.dr(3,r.co||'----------');}
+    P.sep();P.dl(6,'<RTE 2');P.dr(6,r.active?'PERF INIT>':'ACTIVATE>');},
+  DEP(P){const r=C.route;P.title((r.o||'----')+' DEPARTURES');P.lab(1,'SIDS','RUNWAYS');
+    P.dl(1,'PRAC1'+(C.sid?' <SEL>':''));RWYS.forEach((w,i)=>P.dr(i+1,(r.rwy===w?'<SEL> ':'')+w));
+    P.sep();P.dl(6,'<INDEX');P.dr(6,'ROUTE>');},
+  LEGS(P){const r=C.route;const mod=C.mod&&C.mod.type==='dir';
+    P.title((mod?'MOD ':r.active?'ACT ':'')+'RTE 1 LEGS','1/1');
+    let list=r.active?r.legs.slice(r.idx):r.legs;if(mod)list=r.legs.slice(C.mod.idx);
+    let prev=mod?{x:S.x,y:S.y}:r.active?r.from:{x:0,y:0};
+    list.slice(0,5).forEach((n,i)=>{const w=WP[n],crs=Math.round(brg(prev,w)),d=dst(prev,w);
+      P.put(2*(i+1)-1,1,String(crs).padStart(3,'0')+'°','s');P.put(2*(i+1)-1,9,(d<10?d.toFixed(1):Math.round(d))+'NM','s');
+      P.dl(i+1,n,(i===0&&(r.active||mod))?'m':'');
+      const kc=w.c&&!C.del[n];P.dr(i+1,(kc?(S.alt<10000?'250':'310')+'/'+(w.c.padStart(6)):'---/ -----'),kc?'':'s');prev=w;});
+    if(!list.length)P.c(4,'END OF ROUTE','s');
+    P.sep();if(mod){P.dl(6,'<ERASE');}else P.dl(6,'<RTE 2 LEGS');P.dr(6,'RTE DATA>');},
+  PERF(P){const p=C.perf,g=gw();P.title('PERF INIT');
+    P.lab(1,'GR WT','CRZ ALT');P.dl(1,g!=null?g.toFixed(1):'---.-');P.dr(1,p.crz?fmtAlt(p.crz):box(5));
+    P.lab(2,'FUEL','COST INDEX');P.dl(2,FUEL.toFixed(1));P.put(4,5,'CALC','s');P.dr(2,p.ci!=null?String(p.ci):box(4));
+    P.lab(3,'ZFW','MIN FUEL TEMP');P.dl(3,p.zfw!=null?p.zfw.toFixed(1):box(3)+'.'+box(1));P.dr(3,'-37°C');
+    P.lab(4,'RESERVES','CRZ CG');P.dl(4,p.res!=null?p.res.toFixed(1):box(2)+'.'+box(1));P.dr(4,'25.0%');
+    P.lab(5,'DATA LINK','STEP SIZE');P.dl(5,'NO COMM');P.dr(5,'ICAO');P.sep();P.dl(6,'<INDEX');P.dr(6,'THRUST LIM>');},
+  THRUST(P){const t=C.thr;P.title('THRUST LIM');P.lab(1,'SEL','OAT');P.dl(1,(t.temp!=null?t.temp:'--')+'°C');P.dr(1,'+18°C');
+    [['TO',2],['TO 1',3],['TO 2',4]].forEach(([n,i])=>P.dl(i,'<'+n+(t.sel===n?' <SEL>':'')));
+    P.dr(2,'<SEL> CLB>');P.dr(3,'CLB 1>');P.dr(4,'CLB 2>');P.lab(3,'-5%','-10%');P.lab(4,'-15%','-20%');
+    P.sep();P.dl(6,'<INDEX');P.dr(6,'TAKEOFF>');},
+  TAKEOFF(P){const t=C.to,v=vcalc();P.title('TAKEOFF REF','1/2');
+    P.lab(1,'FLAPS','V1');P.dl(1,t.fl!=null?t.fl+'°':box(2)+'°');
+    [['v1',1],['vr',2],['v2',3]].forEach(([k,i])=>{if(t[k])P.dr(i,String(t[k]));else if(v)P.dr(i,String(v[k]),'sc');else P.dr(i,'---');});
+    P.lab(2,'THRUST','VR');P.dl(2,C.thr.sel+(C.thr.temp!=null?' '+C.thr.temp+'°':''));
+    P.lab(3,'CG','V2');P.dl(3,'24.5%');P.put(6,8,'TRIM 5.0','s');
+    P.lab(4,'RWY/POS','GR WT');P.dl(4,C.route.rwy?'RW'+C.route.rwy:'-----');const g=gw();P.dr(4,g!=null?g.toFixed(1):'---.-');
+    const miss=[];if(!C.route.active)miss.push('ROUTE');if(!(C.perf.zfw&&C.perf.crz))miss.push('PERF');if(!(t.v1&&t.vr&&t.v2&&t.fl!=null))miss.push('TAKEOFF');
+    if(miss.length){P.put(9,1,'PRE-FLT','s');P.put(10,0,miss.join(' '),'a');}else P.c(9,'PRE-FLT COMPLETE','s');
+    P.sep();P.dl(6,'<INDEX');P.dr(6,'THRUST LIM>');},
+  VNAV(P){
+    if(S.flags.des&&!S.gnd){const Q=vnavPath();P.title('ACT ECON DES','1/3');
+      P.lab(1,'E/D AT','TOP OF DESC');P.dl(1,'FAF33  3000');P.dr(1,S.flags.descent?'PASSED':Q?Math.max(0,Q.dtg-Q.td).toFixed(0)+' NM':'-----');
+      P.lab(2,'ECON SPD','V DEV');P.dl(2,S.alt<10300?'250/10000':'290/.780');
+      if(S.pathDev!=null)P.dr(2,(S.pathDev>=0?'+':'-')+String(Math.round(Math.abs(S.pathDev)/10)*10).padStart(5)+'FT');
+      P.lab(3,'SPD TRANS','CRZ ALT');P.dl(3,'250/10000');P.dr(3,C.perf.crz?fmtAlt(C.perf.crz):box(5));
+      P.lab(4,'PATH','NEXT');P.dl(4,S.flags.dragReq?'DRAG REQ':S.flags.descent?'ON DES':'LEVEL');const nb=C.route.legs[C.route.idx];P.dr(4,nb||'-----');
+      P.sep();P.dl(6,'<ECON');P.dr(6,'DES NOW>');return;}
+    const ok=vnavReady();P.title((ok&&!S.gnd?'ACT ':'')+'ECON CLB','1/3');P.lab(1,'CRZ ALT');P.dl(1,C.perf.crz?fmtAlt(C.perf.crz):box(5));
+    P.lab(2,'ECON SPD');P.dl(2,'310/.840');P.lab(3,'SPD TRANS');P.dl(3,'250/10000');P.lab(4,'SPD RESTR');P.dl(4,'---/-----');
+    P.lab(1,'','AT');P.dr(1,C.route.legs.length?'-----':'');P.sep();P.dr(6,'CLB DIR>');},
+  PROG(P){const r=C.route,gs=gsNow();P.title((r.d||'')+' PROG','1/3');P.lab(1,'TO','DTG   ETA ');
+    const eta=d=>{const e=new Date(Date.now()+(gs>30?d/gs*3600000:0));return String(e.getUTCHours()).padStart(2,'0')+String(e.getUTCMinutes()).padStart(2,'0')+'z';};
+    if(r.active&&r.idx<r.legs.length){const n=r.legs[r.idx],d=dst(S,WP[n]);P.dl(1,n,'m');P.put(2,11,d.toFixed(1).padStart(5));P.dr(1,eta(d));
+      const n2=r.legs[r.idx+1];P.lab(2,'NEXT');if(n2){const d2=d+dst(WP[n],WP[n2]);P.dl(2,n2);P.put(4,11,d2.toFixed(0).padStart(5));P.dr(2,eta(d2));}}
+    else P.dl(1,'-----');
+    P.lab(3,'DEST');if(r.d){const dd=dst(S,APT[r.d]||APT.RKPC);P.dl(3,r.d);P.put(6,11,dd.toFixed(0).padStart(5));P.dr(3,eta(dd));}
+    P.lab(4,'TOTAL FUEL','FUEL QTY');P.dl(4,(FUEL-S.t*0.0015).toFixed(1));P.dr(4,'CALC');P.sep();P.dl(6,'<POS REPORT');P.dr(6,'POS REF>');},
+  MENU(P){P.title('MENU');P.dl(1,'<FMC');P.dl(2,'<SAT');P.dl(3,'<CMU');P.dr(1,'EFIS CP>');},
+  NA(P){P.title(C.naTitle||'');P.c(5,'NOT AVAILABLE','s');P.c(6,'IN THIS TRAINER','s');},
+};
+function setPage(p,pg=1){C.page=p;C.pg=pg;C.visited[p]=true;}
+function initRef(){if(!C.visited.POS)return setPage('IDENT');if(!(C.perf.zfw&&C.perf.crz))return setPage('PERF');if(!(C.to.v1&&C.to.vr&&C.to.v2))return setPage('TAKEOFF');setPage('INDEX');}
+function inv(m='INVALID ENTRY'){C.msg=m;}
+function lsk(side,n){
+  const sp=C.sp.trim(),r=C.route,ok=()=>{C.sp='';};
+  if(C.msg){C.msg='';}
+  const L=side==='L';
+  switch(C.page){
+  case 'IDENT':if(n===6)setPage(L?'INDEX':'POS');break;
+  case 'INDEX':if(L)setPage([null,'IDENT','POS','PERF','THRUST','TAKEOFF'][n]||C.page);if(L&&n===6){C.naTitle='APPROACH REF';setPage('NA');}break;
+  case 'POS':if(n===6)setPage(L?'INDEX':'RTE');break;
+  case 'RTE':
+    if(n===6){if(L){C.naTitle='RTE 2';setPage('NA');}
+      else if(r.active)setPage('PERF');
+      else if(r.o&&r.d&&r.legs.length){C.mod={type:'act'};}else inv();break;}
+    if(C.pg===2)break;
+    if(n===1){if(!sp)break;if(r.active){inv();break;}if(!/^[A-Z]{4}$/.test(sp)){inv();break;}if(!APT[sp]){inv('NOT IN DATA BASE');break;}
+      if(L){r.o=sp;}else r.d=sp;ok();break;}
+    if(n===2&&L){if(!sp)break;if(!r.o){inv();break;}const w=sp.replace(/^RW/,'');if(!RWYS.includes(w)){inv('NOT IN DATA BASE');break;}r.rwy=w;ok();break;}
+    if(n===2&&!L){if(!sp)break;if(sp.length>10){inv();break;}r.flt=sp;ok();break;}
+    if(n===3&&!L){if(!sp)break;const co=CO[sp];if(!co||(r.o&&r.o!==co.o)||(r.d&&r.d!==co.d)){inv('NOT IN DATA BASE');break;}
+      r.co=sp;r.o=co.o;r.d=co.d;r.legs=[...co.legs];ok();break;}
+    break;
+  case 'DEP':
+    if(n===6){setPage(L?'INDEX':'RTE');break;}
+    if(!r.o){inv();break;}
+    if(L&&n===1){C.sid=C.sid?'':'PRAC1';break;}
+    if(!L&&n<=4){r.rwy=RWYS[n-1];}break;
+  case 'LEGS':{
+    const mod=C.mod&&C.mod.type==='dir';
+    if(n===6){if(L&&mod){C.mod=null;}break;}
+    const list=mod?r.legs.slice(C.mod.idx):(r.active?r.legs.slice(r.idx):r.legs);
+    if(!L)break;
+    if(!sp){const nm=list[n-1];if(nm)C.sp=nm;break;}
+    if(n===1){if(!r.active){inv();break;}const gi=r.legs.indexOf(sp);
+      if(gi<0){inv(WP[sp]||FIX[sp]?'INVALID ENTRY':'NOT IN DATA BASE');break;}
+      if(gi<r.idx){inv();break;}C.mod={type:'dir',idx:gi,name:sp};ok();}
+    else inv();break;}
+  case 'PERF':{const p=C.perf;
+    if(n===6){setPage(L?'INDEX':'THRUST');break;}
+    if(!sp)break;const num=parseFloat(sp);
+    if(!L&&n===1){let a=null;const m1=sp.match(/^FL?(\d{2,3})$/),m2=sp.match(/^(\d{2,3})$/),m3=sp.match(/^(\d{4,5})$/);
+      if(m1)a=+m1[1]*100;else if(m2)a=+m2[1]*100;else if(m3)a=+m3[1];
+      if(a==null||a<1000||a>43100){inv();break;}p.crz=a;ok();break;}
+    if(!L&&n===2){if(!/^\d{1,3}$/.test(sp)){inv();break;}p.ci=+sp;ok();break;}
+    if(L&&n===3){if(isNaN(num)||num<100||num>200){inv();break;}p.zfw=Math.round(num*10)/10;
+      if(C.to.v1){C.to.v1=C.to.vr=C.to.v2=null;C.sp='';C.msg='TAKEOFF SPEEDS DELETED';break;}ok();break;}
+    if(L&&n===4){if(isNaN(num)||num<0||num>30){inv();break;}p.res=Math.round(num*10)/10;ok();break;}
+    inv();break;}
+  case 'THRUST':{
+    if(n===6){setPage(L?'INDEX':'TAKEOFF');break;}
+    if(L&&n===1){if(!sp)break;const v=parseInt(sp,10);if(isNaN(v)||v<0||v>70){inv();break;}C.thr.temp=v;ok();break;}
+    if(L&&n>=2&&n<=4){const s=['TO','TO 1','TO 2'][n-2];if(C.thr.sel!==s){C.thr.sel=s;if(C.to.v1){C.to.v1=C.to.vr=C.to.v2=null;C.msg='TAKEOFF SPEEDS DELETED';}}break;}
+    break;}
+  case 'TAKEOFF':{const t=C.to;
+    if(n===6){setPage(L?'INDEX':'THRUST');break;}
+    if(L&&n===1){if(!sp)break;const f=parseInt(sp,10);if(![5,15,20].includes(f)){inv();break;}
+      if(t.fl!==f&&t.v1){t.v1=t.vr=t.v2=null;C.msg='TAKEOFF SPEEDS DELETED';}t.fl=f;C.sp='';break;}
+    if(!L&&n<=3){const k=['v1','vr','v2'][n-1];
+      if(!sp){const v=vcalc();if(!v){inv();break;}t[k]=v[k];break;}
+      const v=parseInt(sp,10);if(isNaN(v)||v<100||v>200){inv();break;}t[k]=v;ok();break;}
+    break;}
+  case 'VNAV':if(!L&&n===6&&S.flags.des&&!S.gnd)desNow();break;
+  case 'PROG':break;
+  case 'MENU':if(L&&n===1)setPage('IDENT');break;
+  }
+  checkSteps();renderAll();
+}
+function fkey(k){
+  if(C.msg&&k!=='CLR'){}
+  switch(k){
+  case 'INIT REF':initRef();break;
+  case 'RTE':setPage('RTE');break;
+  case 'DEP ARR':setPage('DEP');break;
+  case 'LEGS':setPage('LEGS');break;
+  case 'VNAV':setPage('VNAV');break;
+  case 'PROG':setPage('PROG');break;
+  case 'MENU':setPage('MENU');break;
+  case 'NEXT PAGE':if(C.page==='RTE')C.pg=C.pg===1?2:1;break;
+  case 'PREV PAGE':if(C.page==='RTE')C.pg=C.pg===1?2:1;break;
+  case 'EXEC':
+    if(!C.mod)break;
+    if(C.mod.type==='act'){Object.assign(C.route,{active:true,idx:0,from:{x:0,y:0}});}
+    if(C.mod.type==='dir'){const r=C.route;r.idx=C.mod.idx;r.from={x:S.x,y:S.y};if(C.mod.name==='KILOO')S.flags.dirKiloo=true;if(C.mod.name==='DELTA'&&!S.gnd)S.flags.dirto=true;else if(!S.gnd)S.flags.dirtoOther=true;}
+    C.mod=null;break;
+  case 'ALTN':case 'FIX':case 'HOLD':case 'FMC COMM':case 'NAV RAD':C.naTitle=k;setPage('NA');break;
+  }
+  checkSteps();renderAll();
+}
+function akey(k){
+  if(k==='CLR'){if(C.msg)C.msg='';else if(C.sp==='DELETE')C.sp='';else C.sp=C.sp.slice(0,-1);}
+  else if(k==='DEL'){if(!C.sp)C.sp='DELETE';}
+  else{if(C.msg)C.msg='';if(C.sp==='DELETE')C.sp='';if(C.sp.length<22)C.sp+=(k==='SP'?' ':k==='+/-'?'-':k);}
+  renderCDU();
+}
+let cduBuilt=false,lastScreen='';
+function buildCDU(){
+  const el=$('#cdu');let h='<div class="cdutop"><div class="screen" id="screen"></div>';
+  for(let n=1;n<=6;n++){h+=`<button class="lsk" style="grid-column:1;grid-row:${2*n+1}" data-lsk="L${n}" aria-label="LSK ${n}L"></button><button class="lsk" style="grid-column:3;grid-row:${2*n+1}" data-lsk="R${n}" aria-label="LSK ${n}R"></button>`;}
+  h+='</div><div class="keys"><div class="fk">';
+  ['INIT REF','RTE','DEP ARR','ALTN','VNAV','FIX','LEGS','HOLD','FMC COMM','PROG','MENU','NAV RAD','PREV PAGE','NEXT PAGE','EXEC'].forEach(k=>{h+=`<button data-fk="${k}" class="${k==='EXEC'?'exec':''}">${k.replace(' ','<br>')}</button>`;});
+  h+='</div><div class="akwrap"><div class="ak num">';
+  ['1','2','3','4','5','6','7','8','9','.','0','+/-'].forEach(k=>h+=`<button data-ak="${k}">${k}</button>`);
+  h+='</div><div class="ak alpha">';
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').concat(['SP','DEL','/','CLR']).forEach(k=>h+=`<button data-ak="${k}">${k}</button>`);
+  h+='</div></div></div>';el.innerHTML=h;cduBuilt=true;
+}
+function renderCDU(){
+  const P=scr();(PAGES[C.page]||PAGES.NA)(P);
+  const sp=C.msg||C.sp;P.put(13,0,sp,'');
+  const html=P.L.map((row,ri)=>`<div class="crow">${row.map(c=>`<span class="${c.k}">${c.ch==='<'?'&lt;':c.ch==='>'?'&gt;':c.ch}</span>`).join('')}</div>`).join('');
+  if(html!==lastScreen){$('#screen').innerHTML=html;lastScreen=html;}
+  $('[data-fk="EXEC"]').classList.toggle('lit',!!C.mod);
+}
+
+/* ================= panels (built once, updated in place) ================= */
+function knobHTML(k,push,cls=''){return `<div class="knob ${cls}" data-k="${k}" tabindex="0" role="slider" aria-label="${k} 노브 (드래그로 회전, 탭으로 PUSH)"><span class="dot"></span></div>`;}
+function pm(k){return `<div class="kpm"><button data-kn="${k}" data-n="-1" aria-label="${k} 감소">‹</button><button data-kn="${k}" data-n="1" aria-label="${k} 증가">›</button></div>`;}
+function buildPanels(){
+  const T=(x,y,t,c='')=>`<div class="t ${c}" style="left:${x}px;top:${y}px">${t}</div>`;
+  const LB=(x,y,attr,t)=>`<button class="lb" style="left:${x}px;top:${y}px" ${attr}>${t}</button>`;
+  const KN=(x,y,k,lab)=>`<div class="knob" style="left:${x}px;top:${y}px" data-k="${k}" tabindex="0" role="slider" aria-label="${lab} 노브 (드래그로 회전, 탭으로 PUSH)"><span class="dot"></span></div>`;
+  const PM=(x,y,k)=>`<div class="pmx" style="left:${x}px;top:${y}px"><button data-kn="${k}" data-n="-1" aria-label="${k} 감소">‹</button><button data-kn="${k}" data-n="1" aria-label="${k} 증가">›</button></div>`;
+  const EB=(x,y,attr,t,w,h)=>`<button class="eb" style="left:${x}px;top:${y}px${w?';width:'+w+'px':''}${h?';height:'+h+'px':''}" ${attr}>${t}</button>`;
+  const RB=(x,y,o)=>`<button class="rb" style="left:${x}px;top:${y}px" data-opt="${o}" aria-label="${o}"></button>`;
+  const pol=(cx,cy,r,a)=>[cx+r*Math.sin(a*D2R),cy-r*Math.cos(a*D2R)];
+  let h=`<svg class="deco" width="470" height="262" viewBox="0 0 470 262"><g stroke="#f1d2c0" stroke-width="2" fill="none" stroke-linecap="round">
+    <line x1="282" y1="10" x2="282" y2="252"/>
+    <path d="M40 142 V133 H118 M152 133 H232 V142"/>
+    <rect x="296" y="8" width="162" height="62" rx="4" stroke-width="1.6"/>
+    <line x1="377" y1="30" x2="377" y2="66" stroke="#8d7f77" stroke-width="3"/>
+    <line x1="292" y1="198" x2="464" y2="198"/><line x1="392" y1="198" x2="392" y2="252"/>
+    <path d="M62 36 l4 -6 l4 6 z M246 36 l4 -6 l4 6 z" fill="#f1d2c0" stroke-width="1"/>
+    <path d="M104 207 l6 8 l6 -8 z" fill="#f1d2c0" stroke-width="1"/>
+    </g></svg>`;
+  // MINS
+  h+=T(50,10,'MINS')+LB(22,28,'data-ef="radio"','RADIO')+LB(80,28,'data-ef="baroM"','BARO')
+    +`<div class="ring" style="left:52px;top:66px"></div>`+KN(52,66,'mins','MINS')+PM(52,108,'mins')+`<div class="val" id="minsV" style="left:52px;top:123px"></div>`;
+  // FPV / MTRS
+  h+=T(122,46,'FPV')+RB(122,68,'FPV')+T(170,46,'MTRS')+RB(170,68,'MTRS');
+  // BARO
+  h+=T(238,10,'BARO')+LB(208,28,'data-ef="in"','IN')+LB(268,28,'data-ef="hpa"','HPA')
+    +`<div class="ring" style="left:238px;top:66px"></div>`+KN(238,66,'baro','BARO')+T(238,66,'STD','sm dim')
+    +PM(238,108,'baro')+`<div class="val" id="baroV" style="left:238px;top:123px"></div>`;
+  h+=T(135,133,'ND');
+  // MODE
+  const mc=[64,186];
+  h+=KN(mc[0],mc[1],'mode','ND MODE');
+  [['APP',-80],['VOR',-40],['MAP',2],['PLN',44]].forEach(([m,a])=>{const [x,y]=pol(mc[0],mc[1],40,a);h+=LB(Math.round(x),Math.round(y),`data-ndm="${m}"`,m==='PLN'?'PLAN':m);});
+  h+=T(114,199,'MENU<br>▼','sm');
+  // RANGE
+  h+=T(186,150,'RANGE')+KN(186,186,'range','RANGE')+T(186,186,'CTR','sm dim')
+    +`<button class="lb" style="left:152px;top:188px;font-size:16px" data-kn="range" data-n="-1" aria-label="범위 감소">−</button><button class="lb" style="left:222px;top:188px;font-size:16px" data-kn="range" data-n="1" aria-label="범위 증가">+</button>`
+    +`<div class="val" id="rngV" style="left:186px;top:214px"></div>`;
+  // bottom row
+  h+=EB(52,235,'data-opt="WXR"','WXR',52,26)+EB(112,235,'data-opt="TFC"','TFC',52,26)+EB(172,235,'data-opt="TERR"','TERR',52,26);
+  h+=[['STA',34],['WPT',78],['ARPT',122],['DATA',166],['POS',210]].map(([o,x])=>`<button class="chip" style="left:${x+16}px;top:253px" data-opt="${o}">${o}</button>`).join('');
+  // MFD select
+  h+=`<div class="lampw" id="lampL" style="left:333px;top:20px"></div><div class="lampw on" id="lampR" style="left:421px;top:20px"></div>`+T(377,20,'MFD','sm')
+    +EB(333,48,'data-dsp="L"','L',48,26)+EB(421,48,'data-dsp="R"','R',48,26);
+  h+=EB(324,92,'data-dsp="SYS"','SYS',50,26)+EB(380,92,'data-dsp="CDU"','CDU',50,26)+EB(436,92,'data-dsp="INFO"','INFO',50,26)
+    +EB(324,128,'data-dsp="CHKL"','CHKL',50,26)+EB(380,128,'data-dsp="COMM"','COMM',50,26)+EB(436,128,'data-dsp="ND"','ND',50,26);
+  h+=T(380,158,'ECL')+`<button class="lb" style="left:338px;top:178px;font-size:14px" data-dsp="ECL-" aria-label="ECL 이전">◄</button><div class="cap" style="left:380px;top:178px"></div><button class="lb" style="left:422px;top:178px;font-size:14px" data-dsp="ECL+" aria-label="ECL 다음">►</button>`;
+  h+=EB(332,226,'data-dsp="ENG"','ENG',54,28);
+  h+=T(428,208,'CANCEL<br>RCL','sm')+`<button class="rb" style="left:428:px;top:236px" data-dsp="RCL" aria-label="CANCEL/RCL"></button>`.replace('428:px','428px');
+  $('#efis').innerHTML=h;
+  $('#mcp').innerHTML=mcpHTML();fitMCP();
+}
+function mcpHTML(){
+  const T=(x,y,t,c='')=>`<div class="t ${c}" style="left:${x}px;top:${y}px">${t}</div>`;
+  const B=(x,y,a,id,lab)=>`<button class="pb" style="left:${x}px;top:${y}px" data-act="${a}" id="${id}" aria-label="${lab||a}"></button>`;
+  const SC=(x,y)=>`<div class="screw" style="left:${x}px;top:${y}px"></div>`;
+  const RT=(x,y,a,id,lab)=>`<button class="rt" style="left:${x}px;top:${y}px" data-act="${a}" id="${id}" aria-label="${lab}"><i></i></button>`;
+  const X=(x,y,a,lab)=>`<button class="xfr" style="left:${x}px;top:${y}px" data-act="${a}" aria-label="${lab} XFR"></button>`;
+  const K=(x,y,k,lab,sel)=>`<div class="knob big" style="left:${x}px;top:${y}px" data-k="${k}" tabindex="0" role="slider" aria-label="${lab} 노브 (드래그 회전, 탭 PUSH)"><span class="dot"></span>${sel?'<span class="sel"><b>SEL</b></span>':''}</div>`;
+  const LCD=(x,y,w,h,m1,m2,id,l1,l2,fs)=>`<div class="lcd" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px">${m1?`<span class="m" id="${l1}" style="top:${h>40?7:4}px">${m1}</span><span class="m" id="${l2}" style="top:${h>40?19:15}px">${m2}</span>`:''}<span class="v" id="${id}" style="${fs?'font-size:'+fs+'px;bottom:4px':''}"></span></div>`;
+  const pol=(cx,cy,r,a)=>[cx+r*Math.sin(a*D2R),cy-r*Math.cos(a*D2R)];
+  const hc=[525,138],bank=[['AUTO',-100,52],['10',-56,50],['15',-28,40],['20',0,40],['25',28,40],['30',56,50]];
+  let deco=`<svg class="deco" width="1090" height="250" viewBox="0 0 1090 250"><g stroke="#f1d2c0" stroke-width="2" fill="none" stroke-linecap="round">
+    <circle cx="220" cy="172" r="33"/>${[[220,100],[316,158],[316,205],[158,206]].map(([tx,ty])=>{const dx=tx-220,dy=ty-172,L=Math.hypot(dx,dy);return `<line x1="${220+dx/L*33}" y1="${172+dy/L*33}" x2="${tx}" y2="${ty}"/>`;}).join("")}<path d="M101 48 Q113 38 125 48 M101 78 Q113 88 125 78 M129 48 Q141 38 153 48 M129 78 Q141 88 153 78"/>
+    <path d="M100 80 Q127 92 154 80"/>
+    <path d="M693 96 h12 M693 96 v8 M747 96 h-12 M747 96 v8 M693 206 h12 M693 206 v-8 M747 206 h-12 M747 206 v-8"/>
+    <line x1="670" y1="126" x2="670" y2="208"/><path d="M665 133 l5 -7 l5 7 M665 201 l5 7 l5 -7"/>
+    <line x1="666" y1="167" x2="674" y2="167"/>`;
+  bank.forEach(([n,a])=>{const [x1,y1]=pol(hc[0],hc[1],33,a),[x2,y2]=pol(hc[0],hc[1],38,a);deco+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;});
+  deco+=`<path d="M878 112 L868 104 M918 112 L928 104"/></g></svg>`;
+  let h=deco;
+  h+=T(40,45,'A/P')+B(40,70,'ap','b-ap','A/P L')+SC(37,118)+T(45,160,'F/D<br>ON')+`<button class="tog fdt" style="left:45px;top:196px" data-act="fdL" aria-label="F/D L"><i></i></button>`+T(45,228,'OFF');
+  h+=T(127,12,'A/T ARM')+T(113,27,'1','sm')+T(141,27,'2','sm')+`<button class="tog att" style="left:113px;top:60px" data-act="atL" aria-label="A/T ARM L"><i></i></button><button class="tog att" style="left:141px;top:60px" data-act="atR" aria-label="A/T ARM R"><i></i></button>`+T(127,100,'OFF','sm');
+  h+=T(135,133,'CLB/CON')+B(135,157,'clbcon','b-clbcon','CLB/CON')+T(135,183,'A/T')+B(135,207,'at','b-at','A/T');
+  h+=T(190,22,'IAS')+T(222,21,'(','par')+RT(240,22,'iasmach','rt-spd','IAS/MACH 기준 전환')+T(258,21,')','par')+T(288,22,'MACH')+LCD(242,68,106,56,'IAS','MACH','w-spd','l-ias','l-mach');
+  h+=T(330,22,'XFR')+X(330,50,'xfrSpd','IAS/MACH')+SC(365,37)+K(220,172,'spd','IAS/MACH');
+  h+=T(335,82,'LNAV')+B(335,106,'lnav','b-lnav')+T(335,133,'VNAV')+B(335,157,'vnav','b-vnav')+T(335,183,'FLCH')+B(335,207,'flch','b-flch');
+  h+=`<div class="lamp" style="left:435px;top:85px"></div>`+SC(420,140)+T(435,190,'A/P DISENGAGE')+`<button class="disc787" style="left:435px;top:218px" data-act="disc" id="b-disc" aria-label="A/P DISENGAGE 바"></button>`;
+  h+=T(494,22,'HDG')+T(507,21,'(','par')+RT(525,22,'hdgtrk','rt-hdg','HDG/TRK 기준 전환')+T(543,21,')','par')+T(568,22,'TRK')+LCD(527,68,106,56,'HDG','TRK','w-hdg','l-hdg','l-trk');
+  h+=T(615,22,'XFR')+X(615,50,'xfrHdg','HDG')+SC(625,110);
+  h+=`<div id="bankPtr" style="left:${hc[0]}px;top:${hc[1]}px;width:4px;height:86px;pointer-events:none;background:linear-gradient(#ffffff 0 7px,transparent 7px)"></div>`;
+  h+=K(hc[0],hc[1],'hdg','HDG',true);
+  bank.forEach(([n,a,r])=>{const tk=['15','20','25'].includes(n),[x,y]=pol(hc[0],hc[1],tk?44:r+(n.length>2?8:4),a);
+    h+=`<button class="lab${tk?' tick':''}" style="left:${x}px;top:${y}px" data-bank="${n}" aria-label="BANK LIMIT ${n}">${tk?'':n}</button>`;});
+  h+=T(600,134,'BANK<br>LIMIT')+T(525,185,'HOLD')+B(525,208,'hdgHold','b-hdghold','HDG HOLD');
+  h+=T(690,22,'V/S')+T(702,21,'(','par')+RT(720,22,'vsref','rt-vs','V/S·FPA 기준 전환')+T(738,21,')','par')+T(760,22,'FPA')+LCD(720,52,110,30,'V/S','FPA','w-vs','l-vs','l-fpa',18);
+  h+=`<div class="wheel787" style="left:720px;top:151px" data-wheel="vs" aria-label="V/S 휠 (위로 DOWN, 아래로 UP)"></div>`+T(670,114,'DOWN','sm')+T(670,220,'UP','sm');
+  h+=T(790,185,'VS/FPA')+B(790,208,'vsfpa','b-vs','VS/FPA')+SC(838,205);
+  h+=T(887,22,'ALTITUDE')+LCD(887,68,106,56,'','','w-alt')+T(975,22,'XFR')+X(975,50,'xfrAlt','ALT');
+  h+=`<div id="altPtr" style="left:898px;top:140px;width:5px;height:76px;pointer-events:none;background:linear-gradient(#d9dde1 0 12px,transparent 12px)"></div>`;
+  h+=K(898,140,'alt','ALT')+`<button class="lab" style="left:857px;top:104px" data-altinc="AUTO">AUTO</button><button class="lab" style="left:942px;top:104px" data-altinc="1000">1000</button>`;
+  h+=T(890,185,'HOLD')+B(890,208,'altHold','b-althold','ALT HOLD');
+  h+=T(980,128,'LOC/FAC')+B(980,152,'loc','b-loc','LOC/FAC')+T(980,185,'APP')+B(980,208,'app','b-app','APP')+SC(1050,117);
+  h+=T(1048,45,'A/P')+B(1048,70,'ap','b-ap2','A/P R')+T(1048,160,'F/D<br>ON')+`<button class="tog fdt" style="left:1048px;top:196px" data-act="fdR" aria-label="F/D R"><i></i></button>`+T(1048,228,'OFF');
+  return h;
+}
+const lit=(id,on)=>{const e=$('#'+id);if(e)e.classList.toggle('lit',!!on);};
+function updPanels(){
+  const f=S.fma,m=S.mcp;
+  document.querySelectorAll('.tog').forEach(t=>{const a=t.dataset.act;t.classList.toggle('on',!!S[a]);});
+  lit('b-lnav',f.roll==='LNAV'||f.aRoll==='LNAV');lit('b-vnav',isVnav()||f.aPitch==='VNAV');lit('b-flch',f.pitch==='FLCH SPD');
+  lit('b-ap',S.ap);lit('b-ap2',S.ap);lit('b-at',atArm()&&!!f.thr&&!S.gnd);lit('b-hdghold',f.roll.endsWith('HOLD'));lit('b-vs',f.pitch==='V/S'||f.pitch==='FPA');lit('b-loc',f.aRoll==='LOC'||f.roll==='LOC');lit('b-app',f.aPitch==='G/S'||f.pitch==='G/S');
+  lit('b-althold',f.pitch==='ALT');
+  $('#b-disc').classList.toggle('down',!!S.disc);
+  $('#rt-spd').classList.toggle('on',S.machRef);$('#rt-hdg').classList.toggle('on',S.trk);$('#rt-vs').classList.toggle('on',S.fpaRef);
+  const spdWin=(isVnav()&&!S.spdInt)?'':(S.machRef?'.'+String(Math.round(m.mach*1000)).padStart(3,'0'):String(m.spd));
+  $('#w-spd').textContent=spdWin;$('#l-ias').classList.toggle('on',!S.machRef);$('#l-mach').classList.toggle('on',S.machRef);
+  $('#w-hdg').textContent=String(m.hdg).padStart(3,'0');$('#l-hdg').classList.toggle('on',!S.trk);$('#l-trk').classList.toggle('on',S.trk);
+  const vsOn=f.pitch==='V/S'||f.pitch==='FPA';
+  $('#w-vs').textContent=vsOn?(S.fpaRef?(m.fpa>0?'+':'')+m.fpa.toFixed(1):(m.vs>0?'+':'')+m.vs):'';
+  $('#l-vs').classList.toggle('on',!S.fpaRef);$('#l-fpa').classList.toggle('on',S.fpaRef);
+  $('#w-alt').textContent=m.alt;
+  const ba={AUTO:-100,'10':-56,'15':-28,'20':0,'25':28,'30':56}[S.bank]||0;
+  $('#bankPtr').style.transform=`translate(-50%,-50%) rotate(${ba}deg)`;
+  document.querySelectorAll('[data-bank]').forEach(b=>b.classList.toggle('on',b.dataset.bank===S.bank));
+  $('#altPtr').style.transform=`translate(-50%,-50%) rotate(${S.altInc==='AUTO'?-50:50}deg)`;
+  document.querySelectorAll('[data-altinc]').forEach(b=>b.classList.toggle('on',b.dataset.altinc===S.altInc));
+  document.querySelectorAll('[data-flap]').forEach(b=>b.classList.toggle('on',+b.dataset.flap===S.flapLever));
+  document.querySelectorAll('[data-gear]').forEach(b=>b.classList.toggle('on',b.dataset.gear===S.gearLever));
+  {const sb=$('#sbBtn');if(sb)sb.classList.toggle('on',!!S.sb);}
+  $('#gknob').style.top=S.gearLever==='UP'?'4px':'66px';
+  // efis
+  document.querySelectorAll('[data-ef="radio"],[data-ef="baroM"]').forEach(b=>b.classList.toggle('on',(b.dataset.ef==='baroM')===E.minsBaro));
+  document.querySelectorAll('[data-ef="in"],[data-ef="hpa"]').forEach(b=>b.classList.toggle('on',(b.dataset.ef==='hpa')===E.hpa));
+  document.querySelectorAll('[data-ndm]').forEach(b=>b.classList.toggle('on',b.dataset.ndm===E.mode));
+  document.querySelectorAll('[data-dsp]').forEach(b=>{const d=b.dataset.dsp;b.classList.toggle("cur",d===(E.mfdPage||"ND"));if(d==='L'||d==='R')b.classList.toggle('lit',d===(E.mfd||'R'));});
+  {const l=$('#lampL'),r=$('#lampR');if(l)l.classList.toggle('on',(E.mfd||'R')==='L');if(r)r.classList.toggle('on',(E.mfd||'R')==='R');}
+  $('#minsV').textContent=E.mins+' FT';$('#baroV').textContent=E.std?'STD':E.hpa?Math.round(E.baro)+' HPA':(E.baro*0.02953).toFixed(2)+' IN';
+  $('#rngV').textContent=E.range+' NM'+(E.ctr?' · CTR':'');
+  document.querySelectorAll('[data-opt]').forEach(b=>b.classList.toggle('lit',!!E.opt[b.dataset.opt]));
+  document.querySelectorAll('.knob').forEach(k=>{k.querySelector('.dot').style.transform=`rotate(${S.knob[k.dataset.k]||0}deg)`;});
+}
+
+function fitMCP(){const w=$('#mcpwrap'),z=$('#mcpsizer'),p=$('#mcp');if(!w||!z||!p)return;
+  if(document.body.classList.contains('lay-split')){fitGlare();return;}
+  const s=clamp((w.clientWidth-2)/1092,0.68,1.3);p.style.transform=`scale(${s})`;z.style.width=Math.round(1092*s)+'px';z.style.height=Math.round(252*s)+'px';}
+window.addEventListener('resize',fitMCP);
+
+/* ================= 화면 배치: 분할(split) / 세로(stack) ================= */
+let LAY=null,COLS='auto',efisOpen=null,lastKey='';
+try{LAY=localStorage.getItem('b787lay');}catch(e){}
+function layMode(){return LAY||(window.innerWidth>=1000?'split':'stack');}
+function setBandH(){const g=$('.glare');if(g)document.documentElement.style.setProperty('--bandH',g.offsetHeight+'px');}
+function fitGlare(){
+  const g=$('.glare'),ef=$('#efis'),efs=$('#efsizer'),w=$('#mcpwrap'),z=$('#mcpsizer'),p=$('#mcp');if(!g||!ef||!efs||!w||!z||!p)return;
+  if(!document.body.classList.contains('lay-split')){
+    ef.style.transform='';efs.style.width='';efs.style.height='';w.style.width='';w.style.flex='';fitMCP();setBandH();return;}
+  ef.style.transform='none';
+  const EW=ef.offsetWidth,EH=ef.offsetHeight,gap=10,avail=g.clientWidth;
+  const sc=clamp((avail-gap)/(EW+1092),0.5,1.15);
+  ef.style.transform='scale('+sc+')';efs.style.width=Math.round(EW*sc)+'px';efs.style.height=Math.round(EH*sc)+'px';
+  w.style.width=Math.round(1092*sc)+'px';w.style.flex='none';
+  p.style.transform='scale('+sc+')';z.style.width=Math.round(1092*sc)+'px';z.style.height=Math.round(252*sc)+'px';
+}
+function applyLay(){
+  const m=layMode(),b=document.body;
+  b.classList.toggle('lay-split',m==='split');b.classList.toggle('lay-stack',m==='stack');
+  b.classList.toggle('c3',m==='split'&&COLS==='3');b.classList.toggle('c2',m==='split'&&COLS==='2');
+  b.classList.toggle('efis-off',m==='stack'&&!(efisOpen===null?false:efisOpen));
+  const eb=$('#efbtn');if(eb){const open=!b.classList.contains('efis-off');eb.textContent=open?'EFIS 접기 ▴':'EFIS 펼치기 ▾';eb.setAttribute('aria-expanded',String(open));}
+  document.querySelectorAll('[data-lay]').forEach(x=>x.classList.toggle('on',x.dataset.lay===m));
+  const cb=$('#colbtn');if(cb)cb.textContent='열: '+({auto:'자동','3':'3열','2':'2열'}[COLS]);
+  fitGlare();
+}
+window.addEventListener('resize',applyLay);window.addEventListener('orientationchange',()=>setTimeout(applyLay,200));
+document.addEventListener('click',e=>{const t=e.target;if(!t.closest)return;
+  const ly=t.closest('[data-lay]');if(ly){LAY=ly.dataset.lay;try{localStorage.setItem('b787lay',LAY);}catch(_){}applyLay();return;}
+  const jp=t.closest('[data-jump]');if(jp){const k=jp.dataset.jump,el=k==='disp'?document.querySelector('.disp'):document.getElementById(k);if(el){const rc=$('#rcol');if(document.body.classList.contains('lay-split')&&rc){const r=rc.getBoundingClientRect(),q=el.getBoundingClientRect();rc.scrollTo({top:rc.scrollTop+(q.top-r.top)-44,behavior:'smooth'});}else el.scrollIntoView({block:'start',behavior:'smooth'});}return;}
+  if(t.closest('#colbtn')){COLS=COLS==='auto'?'3':COLS==='3'?'2':'auto';applyLay();return;}
+  if(t.closest('#nowbtn')){document.body.classList.toggle('now-min');const mn=document.body.classList.contains('now-min');$('#nowbtn').textContent=mn?'설명 펼치기 ▾':'설명 접기 ▴';setBandH();return;}
+  if(t.closest('#efbtn')){efisOpen=document.body.classList.contains('efis-off');applyLay();return;}
+});
+
+/* ================= lesson rendering ================= */
+const mm=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+let lastNow='';
+function lesson(){
+  const L=LESSONS[lessonId],pct=Math.round(step/L.length*100);
+  let h;
+  if(step<L.length){const s=L[step];
+    h=`<div class="eyebrow">${LNAME[lessonId]} · 단계 ${step+1} / ${L.length}</div><div class="prog"><i style="width:${pct}%"></i></div><h2 class="stepT">${s.t}</h2><p class="stepD">${s.d}</p><div class="ab"><b>A320과 다른 점</b>${s.ab}</div>`;}
+  else if(lessonId==='ground')h=`<div class="eyebrow">지상 준비 완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">FMC, EFIS, MCP 준비가 끝났습니다</h2><p class="stepD">TAKEOFF REF에 PRE-FLT COMPLETE가 표시되는지 확인하세요. 같은 상태로 이륙 레슨을 이어갈 수 있습니다.</p><button class="next" data-act="cont">이륙 레슨으로 계속</button>`;
+  else if(lessonId==='descent')h=`<div class="eyebrow">완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">강하 · RKSI 33R 레슨 완료</h2><p class="stepD">MCP 고도 설정 → T/D(또는 DES NOW) → VNAV PTH 경로 강하 → 직행 후 DRAG REQUIRED와 스피드브레이크 → 천이고도 BARO → 10000 ft 250 kt → LIMAA 5000B 준수 → APP ARM → LOC·G/S 캡처 순서를 확인했습니다. 이어서 기어 DN과 플랩을 정리하며 착륙까지 비행해 보세요. 속도와 경로 수치는 모두 교육용 가정값이므로 회사 787 FCOM/FCTM을 따르세요.</p>`;
+  else if(lessonId==='approach')h=`<div class="eyebrow">완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">접근 · ILS 레슨 완료</h2><p class="stepD">APP ARM → LOC 캡처 → G/S 캡처 → 기어·플랩 정리 → 안정화 접근 → 접지 순서를 확인했습니다. 이어서 복행 레슨에서 TO/GA 조작을 연습하세요.</p>`;
+  else if(lessonId==='ga')h=`<div class="eyebrow">완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">복행 레슨 완료</h2><p class="stepD">TO/GA 1회(약 2000 fpm 추력)와 2회(최대 추력), 플랩 20, 기어 UP, LNAV와 VNAV 재선택 순서를 확인했습니다.</p>`;
+  else if(lessonId==='climb')h=`<div class="eyebrow">완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">상승 · 헤딩·직행·제한고도 레슨 완료</h2><p class="stepD">VNAV는 제한고도를 지키고(VNAV PTH), ALT 노브 PUSH는 다음 제한을 삭제하며, FLCH는 제한을 무시한다는 것을 확인했습니다. HDG SEL과 DIRECT TO 뒤에는 LNAV를 다시 눌러야 합니다.</p>`;
+  else if(lessonId==='explain')h=`<div class="eyebrow">완료</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">MCP 용어 실습 완료</h2><p class="stepD">LNAV, VNAV, FLCH, 속도 개입, HDG SEL, BANK LIMIT, V/S·FPA를 모두 눌러 봤습니다. 위의 해설 칩으로 각 버튼의 A320 대응과 FMA 표시를 복습하세요.</p>`;
+  else h=`<div class="eyebrow">완료 · ${mm(S.t)}</div><div class="prog"><i style="width:100%"></i></div><h2 class="stepT">이륙 · 초기 상승 레슨 완료</h2><p class="stepD">자유 연습: FLCH, V/S·FPA, HDG SEL, CDU PROG 페이지, EFIS 옵션(DATA, WPT, FPV)을 바꿔 보며 ND와 PFD 변화를 확인하세요.</p>`;
+  h+=`<div class="fb"><span class="${fbMsg.c}">${fbMsg.t}</span></div>`;
+  if(h!==lastNow){$('#now').innerHTML=h;lastNow=h;}
+  {const key=lessonId+':'+step;if(key!==lastKey){lastKey=key;const lc=$('#lcol');if(lc)lc.scrollTop=0;const nw=$('#now');if(nw)nw.scrollTop=0;}}
+  $('#steps').innerHTML=L.map((s,i)=>`<li class="${i<step?'done':i===step?'cur':''}"><span class="k">${i<step?'✓':i+1}</span><span>${s.t}</span><span class="tm">${i<step?mm(stepTimes[i]||0):''}</span></li>`).join('');
+}
+function renderAll(){pfd();nd();eicas();renderCDU();updPanels();lesson();}
+
+/* ================= input ================= */
+document.addEventListener('click',e=>{
+  const t=e.target;
+  const a=t.closest('[data-act]');if(a){act(a.dataset.act);return;}
+  const ls=t.closest('[data-lsk]');if(ls){lsk(ls.dataset.lsk[0],+ls.dataset.lsk[1]);return;}
+  const fk=t.closest('[data-fk]');if(fk){fkey(fk.dataset.fk);return;}
+  const ak=t.closest('[data-ak]');if(ak){akey(ak.dataset.ak);return;}
+  const dp=t.closest('[data-dsp]');if(dp){const d=dp.dataset.dsp;if(d==='L'||d==='R')E.mfd=d;else if(!d.startsWith('ECL')&&d!=='RCL')E.mfdPage=d;fb('MFD/EFIS의 이 버튼은 실제 787의 화면·체크리스트 선택부입니다. 이 트레이너에서는 표시만 지원하고 ND·CDU는 항상 아래 화면에 표시됩니다.');renderAll();return;}
+  const op=t.closest('[data-opt]');if(op){E.opt[op.dataset.opt]=!E.opt[op.dataset.opt];renderAll();return;}
+  const nm=t.closest('[data-ndm]');if(nm){E.mode=nm.dataset.ndm;checkSteps();renderAll();return;}
+  const ef=t.closest('[data-ef]');if(ef){const v=ef.dataset.ef;if(v==='radio')E.minsBaro=false;if(v==='baroM')E.minsBaro=true;if(v==='in')E.hpa=false;if(v==='hpa'){E.hpa=true;E.baro=Math.round(E.baro);}checkSteps();renderAll();return;}
+  const bk=t.closest('[data-bank]');if(bk){S.bank=bk.dataset.bank;showHelp('bank');checkSteps();updPanels();return;}
+  const fl=t.closest('[data-flap]');if(fl){setFlap(+fl.dataset.flap);return;}
+  const gr=t.closest('[data-gear]');if(gr){setGear(gr.dataset.gear);return;}
+  const gt=t.closest('[data-gear-track]');if(gt){setGear(S.gearLever==='UP'?'DN':'UP');return;}
+  const hp=t.closest('[data-help]');if(hp){showHelp(hp.dataset.help);return;}
+  const ai=t.closest('[data-altinc]');if(ai){S.altInc=ai.dataset.altinc;showHelp('altinc');updPanels();return;}
+  const ls2=t.closest('[data-lesson]');if(ls2&&!ls2.disabled){startLesson(ls2.dataset.lesson);return;}
+  const sp=t.closest('[data-sp]');if(sp){simSpeed=+sp.dataset.sp;document.querySelectorAll('[data-sp]').forEach(b=>b.classList.toggle('on',b===sp));}
+});
+let drag=null,rep=null,repT=null;
+function stopRep(){clearTimeout(repT);clearInterval(rep);rep=repT=null;}
+document.addEventListener('pointerdown',e=>{
+  const k=e.target.closest('.knob');
+  if(k){e.preventDefault();const r=k.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+    drag={type:'knob',key:k.dataset.k,cx,cy,a0:Math.atan2(e.clientY-cy,e.clientX-cx),acc:0,moved:false,tm:performance.now()};
+    try{k.setPointerCapture(e.pointerId);}catch(_){}return;}
+  const w=e.target.closest('.wheel,.wheel787');
+  if(w){e.preventDefault();drag={type:'wheel',key:w.dataset.wheel,y0:e.clientY,acc:0};try{w.setPointerCapture(e.pointerId);}catch(_){}return;}
+  const b=e.target.closest('[data-kn]');
+  if(b){e.preventDefault();const key=b.dataset.kn,n=+b.dataset.n;knobTurn(key,n);stopRep();repT=setTimeout(()=>{rep=setInterval(()=>knobTurn(key,n*(['spd','hdg','alt'].includes(key)?5:1)),110);},400);}
+});
+document.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  if(drag.type==='knob'){
+    const a=Math.atan2(e.clientY-drag.cy,e.clientX-drag.cx);let d=a-drag.a0;if(d>Math.PI)d-=2*Math.PI;if(d<-Math.PI)d+=2*Math.PI;drag.a0=a;
+    const now=performance.now(),rate=Math.abs(d*R2D)/Math.max(1,now-drag.tm)*1000;drag.tm=now;
+    drag.acc+=d*R2D;const det=['range','mode'].includes(drag.key)?40:15;
+    if(Math.abs(drag.acc)>=det){const n=Math.trunc(drag.acc/det);drag.acc-=n*det;drag.moved=true;
+      const mult=(rate>500&&['spd','hdg','alt','baro','mins'].includes(drag.key))?(drag.key==='alt'?10:5):1;knobTurn(drag.key,n*mult);}
+    if(Math.abs(d*R2D)>2)drag.moved=drag.moved||Math.abs(drag.acc)>6;
+  }else if(drag.type==='wheel'){
+    drag.acc+=e.clientY-drag.y0;drag.y0=e.clientY;
+    if(Math.abs(drag.acc)>=12){const n=Math.trunc(drag.acc/12);drag.acc-=n*12;knobTurn('vs',n);}
+  }
+});
+document.addEventListener('pointerup',()=>{if(drag&&drag.type==='knob'&&!drag.moved)knobPush(drag.key);drag=null;stopRep();});
+document.addEventListener('pointercancel',()=>{drag=null;stopRep();});
+document.addEventListener('wheel',e=>{const k=e.target.closest('.knob,.wheel,.wheel787');if(!k)return;e.preventDefault();
+  const key=k.dataset.k||k.dataset.wheel;knobTurn(key,e.deltaY<0?1:-1);},{passive:false});
+document.addEventListener('keydown',e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  const k=e.target.closest&&e.target.closest('.knob');
+  if(k){if(e.key==='ArrowRight'||e.key==='ArrowUp'){e.preventDefault();knobTurn(k.dataset.k,1);return;}
+    if(e.key==='ArrowLeft'||e.key==='ArrowDown'){e.preventDefault();knobTurn(k.dataset.k,-1);return;}
+    if(e.key==='Enter'||e.key===' '){e.preventDefault();knobPush(k.dataset.k);return;}}
+  if(e.target.closest&&e.target.closest('button')&&(e.key==='Enter'||e.key===' '))return;
+  const key=e.key.toUpperCase();
+  if(/^[A-Z0-9./]$/.test(key)){e.preventDefault();akey(key);}
+  else if(e.key==='Backspace'){e.preventDefault();akey('CLR');}
+  else if(e.key===' '){e.preventDefault();akey('SP');}
+  else if(e.key==='-'){akey('+/-');}
+});
+
+/* ================= boot ================= */
+buildPanels();buildCDU();buildHelp();applyLay();startLesson('ground');
+let last=performance.now(),cduTick=0;
+setInterval(()=>{const now=performance.now();let dt=Math.min(0.25,(now-last)/1000)*simSpeed;last=now;
+  if(!paused){const n=Math.ceil(dt/0.05);for(let i=0;i<n;i++)tick(dt/n);checkSteps();}
+  pfd();nd();eicas();updPanels();lesson();if(++cduTick%3===0)renderCDU();},100);
+</script>
